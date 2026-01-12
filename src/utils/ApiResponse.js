@@ -1,23 +1,26 @@
 class ApiResponse {
-  static success(res, data, message = 'Success', statusCode = 200) {
-    return res.status(statusCode).json({
+  static success(data, message = 'Success', statusCode = 200) {
+    return {
       success: true,
       message,
-      data
-    });
+      data,
+      statusCode
+    };
   }
 
-  static error(res, message = 'Error', statusCode = 500, errors = null) {
-    return res.status(statusCode).json({
+  static error(message = 'Error', statusCode = 500, errors = null) {
+    return {
       success: false,
       message,
+      statusCode,
       ...(errors && { errors })
-    });
+    };
   }
 
-  static paginate(res, data, page, limit, total) {
-    return res.status(200).json({
+  static paginate(data, page, limit, total, message = 'Success') {
+    return {
       success: true,
+      message,
       data,
       pagination: {
         page: parseInt(page),
@@ -25,7 +28,7 @@ class ApiResponse {
         total,
         pages: Math.ceil(total / limit)
       }
-    });
+    };
   }
 }
 
