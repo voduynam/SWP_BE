@@ -20,7 +20,8 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const config = require('../config/config');
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     // Get user from database
     const user = await AppUser.findById(decoded.id);

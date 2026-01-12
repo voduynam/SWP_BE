@@ -1,9 +1,18 @@
-const app = require('./src/app');
 const dotenv = require('dotenv');
-const connectDB = require('./src/config/database');
 
 // Load environment variables
 dotenv.config();
+
+const app = require('./src/app');
+const connectDB = require('./src/config/database');
+
+// Debug: Check if JWT_SECRET is loaded
+console.log('=== Environment Variables Check ===');
+console.log('PORT:', process.env.PORT);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✓ Loaded' : '✗ NOT FOUND');
+console.log('MONGODB_URI:', process.env.MONGODB_URI ? '✓ Loaded' : '✗ NOT FOUND');
+console.log('===================================');
 
 // Connect to database
 connectDB();

@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const bodyParser = require('body-parser');
 
 const routes = require('./routes');
-
+const config = require('./config/config');
 
 const { errorHandler } = require('./middlewares/errorHandler');
 const { notFound } = require('./middlewares/notFound');
@@ -18,7 +18,7 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*',
+  origin: config.clientUrl || '*',
   credentials: true
 }));
 
