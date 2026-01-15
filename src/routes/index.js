@@ -13,6 +13,9 @@ const inventoryRoutes = require('./inventory.routes');
 const recipeRoutes = require('./recipe.routes');
 const lotRoutes = require('./lot.routes');
 const masterDataRoutes = require('./masterData.routes');
+const returnRequestRoutes = require('./returnRequest.routes');
+const alertRoutes = require('./alert.routes');
+const dashboardRoutes = require('./dashboard.routes');
 
 // Define routes
 router.use('/auth', authRoutes);
@@ -26,6 +29,9 @@ router.use('/inventory', inventoryRoutes);
 router.use('/recipes', recipeRoutes);
 router.use('/lots', lotRoutes);
 router.use('/master-data', masterDataRoutes);
+router.use('/return-requests', returnRequestRoutes);
+router.use('/alerts', alertRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // Default route
 router.get('/', (req, res) => {
@@ -43,7 +49,10 @@ router.get('/', (req, res) => {
       inventory: '/api/inventory',
       recipes: '/api/recipes',
       lots: '/api/lots',
-      'master-data': '/api/master-data'
+      'master-data': '/api/master-data',
+      'return-requests': '/api/return-requests',
+      alerts: '/api/alerts',
+      dashboard: '/api/dashboard'
     }
   });
 });

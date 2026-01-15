@@ -27,6 +27,10 @@ db.org_unit.insertMany([
   { 
     _id: "org_store_q1", type: "STORE", code: "STR_Q1", name: "Cửa hàng Quận 1", 
     address: "45 Lê Thánh Tôn", district: "Quận 1", city: "Hồ Chí Minh", status: "ACTIVE" 
+  },
+  { 
+    _id: "org_store_q3", type: "STORE", code: "STR_Q3", name: "Cửa hàng Quận 3", 
+    address: "78 Võ Văn Tần", district: "Quận 3", city: "Hồ Chí Minh", status: "ACTIVE" 
   }
 ]);
 
@@ -34,29 +38,105 @@ db.org_unit.insertMany([
 db.location.insertMany([
   { _id: "loc_ck_raw", org_unit_id: "org_kitchen_hcm", code: "WH_RAW", name: "Kho Nguyên Liệu", status: "ACTIVE" },
   { _id: "loc_ck_fg", org_unit_id: "org_kitchen_hcm", code: "WH_FG", name: "Kho Thành Phẩm", status: "ACTIVE" },
-  { _id: "loc_str_q1", org_unit_id: "org_store_q1", code: "WH_STR_MAIN", name: "Kho Cửa Hàng", status: "ACTIVE" }
+  { _id: "loc_str_q1", org_unit_id: "org_store_q1", code: "WH_STR_Q1", name: "Kho Cửa Hàng Q1", status: "ACTIVE" },
+  { _id: "loc_str_q3", org_unit_id: "org_store_q3", code: "WH_STR_Q3", name: "Kho Cửa Hàng Q3", status: "ACTIVE" }
 ]);
 
 // 1.4 Role
 db.role.insertMany([
   { _id: "role_admin", code: "ADMIN", name: "Administrator" },
   { _id: "role_manager", code: "MANAGER", name: "Operational Manager" },
-  { _id: "role_chef", code: "CHEF", name: "Head Chef" },
-  { _id: "role_store", code: "STORE_STAFF", name: "Store Employee" }
+  { _id: "role_supply_coordinator", code: "SUPPLY_COORDINATOR", name: "Supply Coordinator" },
+  { _id: "role_chef", code: "CHEF", name: "Central Kitchen Staff" },
+  { _id: "role_store_staff", code: "STORE_STAFF", name: "Franchise Store Staff" }
 ]);
 
 // 1.5 App User
+// ⚠️ NOTE: Passwords are hashed using bcrypt with salt rounds = 10
+// Plain text passwords for testing:
+// - admin: admin123
+// - manager_nam: manager123
+// - coordinator_hoa: coordinator123
+// - chef_tuan: chef123
+// - staff_lan: staff123
+// - staff_minh: staff123
 db.app_user.insertMany([
-  { _id: "user_admin", org_unit_id: "org_kitchen_hcm", username: "admin", full_name: "System Admin", status: "ACTIVE", created_at: new Date() },
-  { _id: "user_chef", org_unit_id: "org_kitchen_hcm", username: "chef_tuan", full_name: "Bếp Trưởng Tuấn", status: "ACTIVE", created_at: new Date() },
-  { _id: "user_store1", org_unit_id: "org_store_q1", username: "staff_lan", full_name: "NV Lan", status: "ACTIVE", created_at: new Date() }
+  { 
+    _id: "user_admin", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "admin", 
+    password: "$2a$10$DkDBqZaf4GiuN6OsYtEy8OBCQQGnh59gGesuBCkRJ6fJSQmDcknTm", // admin123
+    full_name: "Nguyễn Văn Admin", 
+    email: "admin@centralkitchen.com",
+    phone: "0901234567",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_manager", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "manager_nam", 
+    password: "$2a$10$DkDBqZaf4GiuN6OsYtEy8OBCQQGnh59gGesuBCkRJ6fJSQmDcknTm", // manager123
+    full_name: "Trần Văn Nam", 
+    email: "nam.tran@centralkitchen.com",
+    phone: "0902345678",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_coordinator", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "coordinator_hoa", 
+    password: "$2a$10$DkDBqZaf4GiuN6OsYtEy8OBCQQGnh59gGesuBCkRJ6fJSQmDcknTm", // coordinator123
+    full_name: "Lê Thị Hoa", 
+    email: "hoa.le@centralkitchen.com",
+    phone: "0903456789",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_chef", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "chef_tuan", 
+    password: "$2a$10$kBU2J5LKN5JWJm3DGxmI0.38SLaNcECZ1mVaGzjwSUCf63tkrsWVG", // chef123
+    full_name: "Phạm Văn Tuấn", 
+    email: "tuan.pham@centralkitchen.com",
+    phone: "0904567890",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_store1", 
+    org_unit_id: "org_store_q1", 
+    username: "staff_lan", 
+    password: "$2a$10$LTZ2Ue22sYWHfY0MBUvPouSiw8QerlaSXvTpmimC7hPfypcwzdAqq", // staff123
+    full_name: "Nguyễn Thị Lan", 
+    email: "lan.nguyen@store-q1.com",
+    phone: "0905678901",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_store2", 
+    org_unit_id: "org_store_q3", 
+    username: "staff_minh", 
+    password: "$2a$10$LTZ2Ue22sYWHfY0MBUvPouSiw8QerlaSXvTpmimC7hPfypcwzdAqq", // staff123
+    full_name: "Võ Văn Minh", 
+    email: "minh.vo@store-q3.com",
+    phone: "0906789012",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  }
 ]);
 
 // 1.6 User Role
 db.user_role.insertMany([
   { user_id: "user_admin", role_id: "role_admin" },
+  { user_id: "user_manager", role_id: "role_manager" },
+  { user_id: "user_coordinator", role_id: "role_supply_coordinator" },
   { user_id: "user_chef", role_id: "role_chef" },
-  { user_id: "user_store1", role_id: "role_store" }
+  { user_id: "user_store1", role_id: "role_store_staff" },
+  { user_id: "user_store2", role_id: "role_store_staff" }
 ]);
 
 // 1.7 Category

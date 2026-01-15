@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 
 const returnRequestLineSchema = new mongoose.Schema({
+  _id: {
+    type: String,
+    required: true
+  },
   return_request_id: {
     type: String,
     required: true,
     ref: 'ReturnRequest'
-  },
-  source_receipt_line_id: {
-    type: String,
-    ref: 'GoodsReceiptLine'
   },
   item_id: {
     type: String,
@@ -19,19 +19,31 @@ const returnRequestLineSchema = new mongoose.Schema({
     type: String,
     ref: 'Lot'
   },
-  qty_requested: {
+  qty_return: {
     type: Number,
     required: true
+  },
+  uom_id: {
+    type: String,
+    required: true,
+    ref: 'UOM'
+  },
+  reason: {
+    type: String,
+    default: ''
+  },
+  defect_type: {
+    type: String,
+    enum: ['DAMAGED', 'EXPIRED', 'WRONG_ITEM', 'QUALITY_ISSUE', 'OTHER'],
+    default: 'OTHER'
   },
   disposition: {
     type: String,
     enum: ['RESTOCK', 'DESTROY', 'RETURN_TO_SUPPLIER'],
     default: 'RESTOCK'
-  },
-  reason: {
-    type: String
   }
 }, {
+  _id: false,
   timestamps: false
 });
 

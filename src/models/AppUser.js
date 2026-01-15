@@ -27,6 +27,17 @@ const appUserSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email']
+  },
+  phone: {
+    type: String,
+    trim: true,
+    match: [/^[0-9]{10,11}$/, 'Please provide a valid phone number']
+  },
   status: {
     type: String,
     enum: ['ACTIVE', 'INACTIVE'],

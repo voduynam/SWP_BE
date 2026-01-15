@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
-const { protect } = require('../middlewares/auth');
+const { protect, authorize } = require('../middlewares/auth');
 const { validateLogin, validateRegister } = require('../middlewares/validator');
 
 // @route   POST /api/auth/register
@@ -18,5 +18,20 @@ router.post('/login', validateLogin, authController.login);
 // @desc    Get current user
 // @access  Private
 router.get('/me', protect, authController.getMe);
+
+// @route   POST /api/auth/logout
+// @desc    Logout user
+// @access  Private
+router.post('/logout', protect, authController.logout);
+
+// @route   PUT /api/auth/change-password
+// @desc    Change password
+// @access  Private
+router.put('/change-password', protect, authController.changePassword);
+
+// @route   PUT /api/auth/reset-password/:userId
+// @desc    Reset password (Admin only)
+// @access  Private/Admin
+router.put('/reset-password/:userId', protect, authorize('ADMIN'), authController.resetPassword);
 
 module.exports = router;

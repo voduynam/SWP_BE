@@ -160,3 +160,96 @@ exports.getMe = asyncHandler(async (req, res) => {
     })
   );
 });
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = asyncHandler(async (req, res) => {
+  // Since we're using JWT, logout is handled on the client side
+  // by removing the token from storage
+  // This endpoint is here for consistency and can be used for logging purposes
+  
+  return res.status(200).json(
+    ApiResponse.success(null, 'Logout successful')
+  );
+});
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+exports.changePassword = asyncHandler(async (req, res) => {
+  const { current_password, new_password } = req.body;
+
+  if (!current_password || !new_password) {
+    return res.status(400).json(
+      ApiResponse.error('Please provide current password and new password', 400)
+    );
+  }
+
+  // Validate new password length
+  if (new_password.length < 6) {
+    return res.status(400).json(
+      ApiResponse.error('New password must be at least 6 characters', 400)
+    );
+  }
+
+  // Get user with password
+  const user = await AppUser.findById(req.user.id).select('+password');
+  if (!user) {
+    return res.status(404).json(
+      ApiResponse.error('User not found', 404)
+    );
+  }
+
+  // Verify current password
+  const isMatch = await user.comparePassword(current_password);
+  if (!isMatch) {
+    return res.status(401).json(
+      ApiResponse.error('Current password is incorrect', 401)
+    );
+  }
+
+  // Update password
+  user.password = new_password;
+  await user.save();
+
+  return res.status(200).json(
+    ApiResponse.success(null, 'Password changed successfully')
+  );
+});
+
+// @desc    Reset password (Admin only)
+// @route   PUT /api/auth/reset-password/:userId
+// @access  Private/Admin
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const { new_password } = req.body;
+
+  if (!new_password) {
+    return res.status(400).json(
+      ApiResponse.error('Please provide new password', 400)
+    );
+  }
+
+  // Validate new password length
+  if (new_password.length < 6) {
+    return res.status(400).json(
+      ApiResponse.error('New password must be at least 6 characters', 400)
+    );
+  }
+
+  // Get user
+  const user = await AppUser.findById(req.params.userId).select('+password');
+  if (!user) {
+    return res.status(404).json(
+      ApiResponse.error('User not found', 404)
+    );
+  }
+
+  // Update password
+  user.password = new_password;
+  await user.save();
+
+  return res.status(200).json(
+    ApiResponse.success(null, 'Password reset successfully')
+  );
+});

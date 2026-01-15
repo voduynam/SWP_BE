@@ -5,24 +5,37 @@ const returnRequestSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  return_no: {
+    type: String,
+    required: true,
+    unique: true
+  },
   store_org_unit_id: {
     type: String,
     required: true,
     ref: 'OrgUnit'
   },
-  source_receipt_id: {
+  goods_receipt_id: {
     type: String,
     ref: 'GoodsReceipt'
   },
-  request_date: {
+  return_date: {
     type: Date,
     required: true,
     default: Date.now
   },
+  reason: {
+    type: String,
+    default: ''
+  },
   status: {
     type: String,
-    enum: ['REQUESTED', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED'],
-    default: 'REQUESTED'
+    enum: ['PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED'],
+    default: 'PENDING'
+  },
+  resolution_notes: {
+    type: String,
+    default: ''
   },
   created_by: {
     type: String,
