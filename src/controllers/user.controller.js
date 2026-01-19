@@ -118,3 +118,112 @@ exports.deleteUser = asyncHandler(async (req, res) => {
     ApiResponse.success(null, 'User deactivated successfully')
   );
 });
+
+// @desc    Assign roles to user
+// @route   POST /api/users/:id/roles
+// @access  Private/Admin
+exports.assignRoles = asyncHandler(async (req, res) => {
+  const { role_ids } = req.body;
+
+  if (!role_ids || !Array.isArray(role_ids) || role_ids.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('Please provide an array of role IDs', 400)
+    );
+  }
+
+  // Check if user exists
+  const user = await AppUser.findById(req.params.id);
+  if (!user) {
+    return res.status(404).json(
+      ApiResponse.error('User not found', 404)
+    );
+  }
+
+  // Validate roles exist
+  const roles = await Role.find({ _id: { $in: role_ids } });
+  if (roles.length !== role_ids.length) {
+    return res.status(400).json(
+      ApiResponse.error('One or more roles not found', 400)
+    );
+  }
+
+  // Get existing roles
+  const existingUserRoles = await UserRole.find({ user_id: req.params.id });
+  const existingRoleIds = existingUserRoles.map(ur => ur.role_id);
+
+  // Filter out roles that are already assigned
+  const newRoleIds = role_ids.filter(rid => !existingRoleIds.includes(rid));
+
+  if (newRoleIds.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('All roles are already assigned to this user', 400)
+    );
+  }
+
+  // Assign new roles
+  const roleAssignments = newRoleIds.map(role_id => ({
+    user_id: req.params.id,
+    role_id
+  }));
+  await UserRole.insertMany(roleAssignments);
+
+  // Get updated user with roles
+  const updatedUserRoles = await UserRole.find({ user_id: req.params.id });
+  const allRoleIds = updatedUserRoles.map(ur => ur.role_id);
+  const allRoles = await Role.find({ _id: { $in: allRoleIds } });
+
+  return res.status(200).json(
+    ApiResponse.success({
+      user_id: user._id,
+      username: user.username,
+      roles: allRoles.map(r => ({ id: r._id, code: r.code, name: r.name }))
+    }, 'Roles assigned successfully')
+  );
+});
+
+// @desc    Remove roles from user
+// @route   DELETE /api/users/:id/roles
+// @access  Private/Admin
+exports.removeRoles = asyncHandler(async (req, res) => {
+  const { role_ids } = req.body;
+
+  if (!role_ids || !Array.isArray(role_ids) || role_ids.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('Please provide an array of role IDs', 400)
+    );
+  }
+
+  // Check if user exists
+  const user = await AppUser.findById(req.params.id);
+  if (!user) {
+    return res.status(404).json(
+      ApiResponse.error('User not found', 404)
+    );
+  }
+
+  // Remove roles
+  const result = await UserRole.deleteMany({
+    user_id: req.params.id,
+    role_id: { $in: role_ids }
+  });
+
+  if (result.deletedCount === 0) {
+    return res.status(400).json(
+      ApiResponse.error('No roles were removed. User may not have these roles.', 400)
+    );
+  }
+
+  // Get remaining user roles
+  const remainingUserRoles = await UserRole.find({ user_id: req.params.id });
+  const remainingRoleIds = remainingUserRoles.map(ur => ur.role_id);
+  const remainingRoles = await Role.find({ _id: { $in: remainingRoleIds } });
+
+  return res.status(200).json(
+    ApiResponse.success({
+      user_id: user._id,
+      username: user.username,
+      roles: remainingRoles.map(r => ({ id: r._id, code: r.code, name: r.name })),
+      removed_count: result.deletedCount
+    }, 'Roles removed successfully')
+  );
+});

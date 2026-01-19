@@ -39,5 +39,16 @@ exports.validateRegister = [
   body('org_unit_id')
     .notEmpty()
     .withMessage('Organization unit is required'),
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+  body('phone')
+    .optional()
+    .trim()
+    .matches(/^[0-9]{10,11}$/)
+    .withMessage('Phone number must be 10-11 digits (no spaces or special characters)'),
   handleValidationErrors
 ];

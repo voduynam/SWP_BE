@@ -43,6 +43,14 @@ const appUserSchema = new mongoose.Schema({
     enum: ['ACTIVE', 'INACTIVE'],
     default: 'ACTIVE'
   },
+  password_setup_token: {
+    type: String,
+    select: false
+  },
+  password_setup_expires: {
+    type: Date,
+    select: false
+  },
   created_at: {
     type: Date,
     default: Date.now
