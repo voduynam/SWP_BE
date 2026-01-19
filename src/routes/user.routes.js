@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
+const { protect, authorize } = require('../middlewares/auth');
+
+// All routes require authentication
+router.use(protect);
 
 // @route   GET /api/users
 // @desc    Get all users
 // @access  Private/Admin
-router.get('/', userController.getAllUsers);
+router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
 
 // @route   GET /api/users/:id
 // @desc    Get user by ID
@@ -20,6 +24,6 @@ router.put('/:id', userController.updateUser);
 // @route   DELETE /api/users/:id
 // @desc    Delete user
 // @access  Private/Admin
-router.delete('/:id', userController.deleteUser);
+router.delete('/:id', authorize('ADMIN'), userController.deleteUser);
 
 module.exports = router;

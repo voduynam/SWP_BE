@@ -1,0 +1,342 @@
+try {
+  db.getCollectionNames().forEach(c => db[c].drop());
+} catch (e) {
+  // Bỏ qua lỗi nếu database chưa có gì
+}
+
+// ==========================================
+// 1. MASTER DATA (Dữ liệu nền tảng)
+// ==========================================
+
+// 1.1 UOM
+db.uom.insertMany([
+  { _id: "uom_kg", code: "KG", name: "Kilogram" },
+  { _id: "uom_g", code: "G", name: "Gram" },
+  { _id: "uom_liter", code: "L", name: "Liter" },
+  { _id: "uom_pack", code: "PACK", name: "Gói/Túi" },
+  { _id: "uom_carton", code: "CARTON", name: "Thùng" },
+  { _id: "uom_unit", code: "UNIT", name: "Cái/Chiếc" }
+]);
+
+// 1.2 Org Unit
+db.org_unit.insertMany([
+  { 
+    _id: "org_kitchen_hcm", type: "KITCHEN", code: "CK_HCM", name: "Bếp Trung Tâm HCM", 
+    address: "123 KCN Tân Bình", district: "Tân Bình", city: "Hồ Chí Minh", status: "ACTIVE" 
+  },
+  { 
+    _id: "org_store_q1", type: "STORE", code: "STR_Q1", name: "Cửa hàng Quận 1", 
+    address: "45 Lê Thánh Tôn", district: "Quận 1", city: "Hồ Chí Minh", status: "ACTIVE" 
+  },
+  { 
+    _id: "org_store_q3", type: "STORE", code: "STR_Q3", name: "Cửa hàng Quận 3", 
+    address: "78 Võ Văn Tần", district: "Quận 3", city: "Hồ Chí Minh", status: "ACTIVE" 
+  }
+]);
+
+// 1.3 Location
+db.location.insertMany([
+  { _id: "loc_ck_raw", org_unit_id: "org_kitchen_hcm", code: "WH_RAW", name: "Kho Nguyên Liệu", status: "ACTIVE" },
+  { _id: "loc_ck_fg", org_unit_id: "org_kitchen_hcm", code: "WH_FG", name: "Kho Thành Phẩm", status: "ACTIVE" },
+  { _id: "loc_str_q1", org_unit_id: "org_store_q1", code: "WH_STR_Q1", name: "Kho Cửa Hàng Q1", status: "ACTIVE" },
+  { _id: "loc_str_q3", org_unit_id: "org_store_q3", code: "WH_STR_Q3", name: "Kho Cửa Hàng Q3", status: "ACTIVE" }
+]);
+
+// 1.4 Role
+db.role.insertMany([
+  { _id: "role_admin", code: "ADMIN", name: "Administrator" },
+  { _id: "role_manager", code: "MANAGER", name: "Operational Manager" },
+  { _id: "role_supply_coordinator", code: "SUPPLY_COORDINATOR", name: "Supply Coordinator" },
+  { _id: "role_chef", code: "CHEF", name: "Central Kitchen Staff" },
+  { _id: "role_store_staff", code: "STORE_STAFF", name: "Franchise Store Staff" }
+]);
+
+// 1.5 App User
+// ⚠️ NOTE: Passwords are hashed using bcrypt with salt rounds = 10
+// Plain text passwords for testing:
+// - admin: admin123
+// - manager_nam: manager123
+// - coordinator_hoa: coordinator123
+// - chef_tuan: chef123
+// - staff_lan: staff123
+// - staff_minh: staff123
+db.app_user.insertMany([
+  { 
+    _id: "user_admin", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "admin", 
+    password: "$2a$10$DkDBqZaf4GiuN6OsYtEy8OBCQQGnh59gGesuBCkRJ6fJSQmDcknTm", // admin123
+    full_name: "Nguyễn Văn Admin", 
+    email: "admin@centralkitchen.com",
+    phone: "0901234567",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_manager", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "manager_nam", 
+    password: "$2a$10$DkDBqZaf4GiuN6OsYtEy8OBCQQGnh59gGesuBCkRJ6fJSQmDcknTm", // manager123
+    full_name: "Trần Văn Nam", 
+    email: "nam.tran@centralkitchen.com",
+    phone: "0902345678",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_coordinator", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "coordinator_hoa", 
+    password: "$2a$10$DkDBqZaf4GiuN6OsYtEy8OBCQQGnh59gGesuBCkRJ6fJSQmDcknTm", // coordinator123
+    full_name: "Lê Thị Hoa", 
+    email: "hoa.le@centralkitchen.com",
+    phone: "0903456789",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_chef", 
+    org_unit_id: "org_kitchen_hcm", 
+    username: "chef_tuan", 
+    password: "$2a$10$kBU2J5LKN5JWJm3DGxmI0.38SLaNcECZ1mVaGzjwSUCf63tkrsWVG", // chef123
+    full_name: "Phạm Văn Tuấn", 
+    email: "tuan.pham@centralkitchen.com",
+    phone: "0904567890",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_store1", 
+    org_unit_id: "org_store_q1", 
+    username: "staff_lan", 
+    password: "$2a$10$LTZ2Ue22sYWHfY0MBUvPouSiw8QerlaSXvTpmimC7hPfypcwzdAqq", // staff123
+    full_name: "Nguyễn Thị Lan", 
+    email: "lan.nguyen@store-q1.com",
+    phone: "0905678901",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  },
+  { 
+    _id: "user_store2", 
+    org_unit_id: "org_store_q3", 
+    username: "staff_minh", 
+    password: "$2a$10$LTZ2Ue22sYWHfY0MBUvPouSiw8QerlaSXvTpmimC7hPfypcwzdAqq", // staff123
+    full_name: "Võ Văn Minh", 
+    email: "minh.vo@store-q3.com",
+    phone: "0906789012",
+    status: "ACTIVE", 
+    created_at: new Date() 
+  }
+]);
+
+// 1.6 User Role
+db.user_role.insertMany([
+  { user_id: "user_admin", role_id: "role_admin" },
+  { user_id: "user_manager", role_id: "role_manager" },
+  { user_id: "user_coordinator", role_id: "role_supply_coordinator" },
+  { user_id: "user_chef", role_id: "role_chef" },
+  { user_id: "user_store1", role_id: "role_store_staff" },
+  { user_id: "user_store2", role_id: "role_store_staff" }
+]);
+
+// 1.7 Category
+db.category.insertMany([
+  { _id: "cat_meat", name: "Thịt & Hải Sản", parent_id: null },
+  { _id: "cat_veg", name: "Rau Củ Quả", parent_id: null },
+  { _id: "cat_sauce", name: "Sốt & Gia Vị", parent_id: null },
+  { _id: "cat_package", name: "Bao Bì", parent_id: null }
+]);
+
+// 1.8 Supplier
+db.supplier.insertMany([
+  { _id: "sup_cp", name: "CP Foods Vietnam", tax_code: "010123", address: "Biên Hòa, Đồng Nai" },
+  { _id: "sup_dalat", name: "Nông Trại Đà Lạt Gap", tax_code: "020987", address: "Đà Lạt, Lâm Đồng" }
+]);
+
+// 1.9 Item
+db.item.insertMany([
+  { 
+    _id: "item_beef", sku: "RM001", name: "Thịt bò xay", item_type: "RAW", 
+    base_uom_id: "uom_kg", category_id: "cat_meat", tracking_type: "LOT_EXPIRY", shelf_life_days: 7,
+    cost_price: 150000, base_sell_price: 0, status: "ACTIVE" 
+  },
+  { 
+    _id: "item_tomato", sku: "RM002", name: "Cà chua", item_type: "RAW", 
+    base_uom_id: "uom_kg", category_id: "cat_veg", tracking_type: "NONE", shelf_life_days: 5,
+    cost_price: 20000, base_sell_price: 0, status: "ACTIVE" 
+  },
+  { 
+    _id: "item_sauce_bol", sku: "FP001", name: "Sốt Bolognese (Túi 1kg)", item_type: "FINISHED", 
+    base_uom_id: "uom_pack", category_id: "cat_sauce", tracking_type: "LOT_EXPIRY", shelf_life_days: 30,
+    cost_price: 0, base_sell_price: 250000, status: "ACTIVE" 
+  }
+]);
+
+// 1.10 Item UOM Conversion
+db.item_uom_conversion.insertMany([
+  { item_id: "item_sauce_bol", uom_id: "uom_carton", base_qty: 12, is_default_purchase: false, is_default_sell: true },
+  { item_id: "item_beef", uom_id: "uom_g", base_qty: 0.001, is_default_purchase: false, is_default_sell: false }
+]);
+
+// ==========================================
+// 2. PRODUCTION DATA
+// ==========================================
+
+// 2.1 Recipe
+db.recipe.insertMany([
+  { 
+    _id: "recipe_sauce_v1", item_id: "item_sauce_bol", version: "1.0", status: "ACTIVE", 
+    effective_from: new Date("2023-01-01"), effective_to: null 
+  }
+]);
+
+// 2.2 Recipe Line
+db.recipe_line.insertMany([
+  { recipe_id: "recipe_sauce_v1", material_item_id: "item_beef", qty_per_batch: 5, uom_id: "uom_kg", scrap_rate: 0.05 },
+  { recipe_id: "recipe_sauce_v1", material_item_id: "item_tomato", qty_per_batch: 8, uom_id: "uom_kg", scrap_rate: 0.10 }
+]);
+
+// 2.3 Lot
+db.lot.insertMany([
+  { _id: "lot_beef_A", item_id: "item_beef", lot_code: "L-BEEF-001", mfg_date: new Date("2023-10-01"), exp_date: new Date("2023-10-08") },
+  { _id: "lot_sauce_B", item_id: "item_sauce_bol", lot_code: "L-SAUCE-001", mfg_date: new Date("2023-10-02"), exp_date: new Date("2023-11-02") }
+]);
+
+// 2.4 Inventory Balance
+db.inventory_balance.insertMany([
+  { location_id: "loc_ck_raw", item_id: "item_beef", lot_id: "lot_beef_A", qty_on_hand: 100, qty_reserved: 0, updated_at: new Date() },
+  { location_id: "loc_ck_fg", item_id: "item_sauce_bol", lot_id: "lot_sauce_B", qty_on_hand: 50, qty_reserved: 0, updated_at: new Date() }
+]);
+
+// ==========================================
+// 3. ORDERING
+// ==========================================
+
+// 3.1 Internal Order
+db.internal_order.insertMany([
+  { 
+    _id: "ord_001", order_no: "SO-1001", store_org_unit_id: "org_store_q1", 
+    order_date: new Date("2023-10-05"), status: "SUBMITTED", created_by: "user_store1",
+    total_amount: 2500000, currency: "VND"
+  }
+]);
+
+// 3.2 Internal Order Line
+db.internal_order_line.insertMany([
+  { _id: "ord_line_01", order_id: "ord_001", item_id: "item_sauce_bol", qty_ordered: 10, uom_id: "uom_pack", unit_price: 250000, line_total: 2500000 }
+]);
+
+// 3.3 Order Fulfillment
+db.order_fulfillment.insertMany([
+  { fulfillment_id: 1, order_line_id: "ord_line_01", qty_shipped_total: 0, qty_received_total: 0, updated_at: new Date() }
+]);
+
+// ==========================================
+// 4. PRODUCTION PROCESS
+// ==========================================
+
+// 4.1 Production Order
+db.production_order.insertMany([
+  { 
+    _id: "po_001", prod_order_no: "PO-2310-01", planned_start: new Date("2023-10-06"), planned_end: new Date("2023-10-06"), 
+    status: "DONE", created_by: "user_chef" 
+  }
+]);
+
+// 4.2 Production Order Line
+db.production_order_line.insertMany([
+  { 
+    _id: "po_line_01", prod_order_id: "po_001", item_id: "item_sauce_bol", recipe_id: "recipe_sauce_v1", 
+    planned_qty: 20, actual_qty: 20, uom_id: "uom_pack" 
+  }
+]);
+
+// 4.3 Production Consumption
+db.production_consumption.insertMany([
+  { prod_order_line_id: "po_line_01", material_item_id: "item_beef", lot_id: "lot_beef_A", qty: 10, uom_id: "uom_kg" }
+]);
+
+// 4.4 Production Output Lot
+db.production_output_lot.insertMany([
+  { prod_order_line_id: "po_line_01", lot_id: "lot_sauce_B", qty: 20, uom_id: "uom_pack" }
+]);
+
+// ==========================================
+// 5. SHIPMENT
+// ==========================================
+
+// 5.1 Shipment
+db.shipment.insertMany([
+  { 
+    _id: "ship_001", shipment_no: "SH-1001", order_id: "ord_001", 
+    from_location_id: "loc_ck_fg", to_location_id: "loc_str_q1", 
+    ship_date: new Date("2023-10-07"), status: "SHIPPED", created_by: "user_chef" 
+  }
+]);
+
+// 5.2 Shipment Line
+db.shipment_line.insertMany([
+  { _id: "ship_line_01", shipment_id: "ship_001", item_id: "item_sauce_bol", qty: 10, uom_id: "uom_pack", order_line_id: "ord_line_01" }
+]);
+
+// 5.3 Shipment Line Lot
+db.shipment_line_lot.insertMany([
+  { shipment_line_id: "ship_line_01", lot_id: "lot_sauce_B", qty: 10 }
+]);
+
+// ==========================================
+// 6. RECEIVING
+// ==========================================
+
+// 6.1 Goods Receipt
+db.goods_receipt.insertMany([
+  { 
+    _id: "gr_001", receipt_no: "GR-1001", shipment_id: "ship_001", 
+    received_date: new Date("2023-10-07"), status: "RECEIVED", received_by: "user_store1" 
+  }
+]);
+
+// 6.2 Goods Receipt Line
+db.goods_receipt_line.insertMany([
+  { _id: "gr_line_01", receipt_id: "gr_001", shipment_line_id: "ship_line_01", item_id: "item_sauce_bol", qty_received: 10, qty_rejected: 0 }
+]);
+
+// ==========================================
+// 7. RETURNS & TRANSACTIONS
+// ==========================================
+
+// 7.1 Return Request
+db.return_request.insertMany([
+  { _id: "ret_req_01", store_org_unit_id: "org_store_q1", source_receipt_id: "gr_001", request_date: new Date(), status: "REQUESTED", created_by: "user_store1" }
+]);
+
+// 7.2 Return Request Line
+db.return_request_line.insertMany([
+  { return_request_id: "ret_req_01", source_receipt_line_id: "gr_line_01", item_id: "item_sauce_bol", lot_id: "lot_sauce_B", qty_requested: 1, disposition: "RESTOCK" }
+]);
+
+// --- [SỬA LỖI Ở ĐÂY] ---
+// Thay vì insertMany([]), chúng ta dùng createCollection để tạo bảng rỗng
+
+// 7.3 Return Shipment (Tạo bảng rỗng)
+db.createCollection("return_shipment");
+
+// 7.4 Return Shipment Line Lot (Tạo bảng rỗng)
+db.createCollection("return_shipment_line_lot");
+
+// 7.5 Return Receipt (Tạo bảng rỗng)
+db.createCollection("return_receipt");
+
+// 7.6 Inventory Transaction
+db.inventory_transaction.insertMany([
+  { 
+    txn_time: new Date(), location_id: "loc_ck_fg", item_id: "item_sauce_bol", lot_id: "lot_sauce_B", 
+    qty: -10, uom_id: "uom_pack", txn_type: "TRANSFER_OUT", ref_type: "SHIPMENT", ref_id: "ship_001", created_by: "user_chef" 
+  },
+  { 
+    txn_time: new Date(), location_id: "loc_str_q1", item_id: "item_sauce_bol", lot_id: "lot_sauce_B", 
+    qty: 10, uom_id: "uom_pack", txn_type: "TRANSFER_IN", ref_type: "GOODS_RECEIPT", ref_id: "gr_001", created_by: "user_store1" 
+  }
+]);
+
+print(">>> SUCCESS: Database Created Successfully!");

@@ -1,16 +1,23 @@
 const jwt = require('jsonwebtoken');
+const config = require('../config/config');
 
 // Generate JWT token
 exports.generateToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE || '7d'
+  if (!config.jwtSecret) {
+    throw new Error('JWT_SECRET is not configured. Please check your .env file');
+  }
+  return jwt.sign(payload, config.jwtSecret, {
+    expiresIn: config.jwtExpire
   });
 };
 
 // Verify JWT token
 exports.verifyToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    if (!config.jwtSecret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+    return jwt.verify(token, config.jwtSecret);
   } catch (error) {
     return null;
   }
