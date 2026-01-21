@@ -936,4 +936,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ by the Central Kitchen Team**
 
-**Last Updated:** January 18, 2024
+**Last Updated:** 2026
