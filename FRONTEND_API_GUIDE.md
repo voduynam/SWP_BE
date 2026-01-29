@@ -4,7 +4,7 @@
 
 **Base URL:** `http://localhost:5001/api`
 
-**Last Updated:** January 2024
+**Last Updated:** January 29, 2026
 
 ---
 
@@ -18,8 +18,10 @@
 6. [Manager Features](#manager-features)
 7. [Admin Features](#admin-features)
 8. [Common Workflows](#common-workflows)
-9. [Data Models](#data-models)
-10. [Error Handling](#error-handling)
+9. [Notifications & Socket.io](#notifications--socketio) ⭐ NEW
+10. [Manager Advanced Features](#manager-advanced-features) ⭐ NEW
+11. [Data Models](#data-models)
+12. [Error Handling](#error-handling)
 
 ---
 
@@ -1367,7 +1369,37 @@ PUT /api/return-requests/:id/process
 PUT /api/return-requests/:id/status
 { "status": "COMPLETED" }
 ```
+---
 
+## 🔔 NOTIFICATIONS & SOCKET.IO ⭐ NEW
+
+Hệ thống hỗ trợ thông báo thời gian thực qua Socket.io.
+
+### 1. Kết nối Socket.io
+- **URL:** `http://localhost:5001`
+- **Auth:** Gửi token qua `auth.token` khi handshake.
+
+### 2. API Endpoints
+- **Lấy danh sách thông báo:** `GET /api/notifications`
+- **Đánh dấu đã đọc:** `PUT /api/notifications/:id/read`
+- **Đánh dấu tất cả đã đọc:** `PUT /api/notifications/read-all`
+
+---
+
+## 📈 MANAGER ADVANCED FEATURES ⭐ NEW
+
+### 1. Consolidated Orders (Gom đơn hàng)
+- **Tạo bảng gom đơn:** `POST /api/consolidated-orders/generate`
+- **Lấy bảng gom đơn:** `GET /api/consolidated-orders`
+
+### 2. Performance Metrics (Chỉ số hiệu quả)
+- **Hiệu suất sản xuất:** `GET /api/performance-metrics/production-efficiency`
+- **Độ chính xác đơn hàng:** `GET /api/performance-metrics/store-order-accuracy`
+
+### 3. Exception Management (Quản lý sự cố)
+- **Ghi nhận sự cố:** `POST /api/exceptions`
+- **Danh sách sự cố:** `GET /api/exceptions`
+- **Giải quyết sự cố:** `PUT /api/exceptions/:id/resolve`
 
 ---
 

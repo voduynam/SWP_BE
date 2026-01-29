@@ -3,32 +3,84 @@ const router = express.Router();
 const dashboardController = require('../controllers/dashboard.controller');
 const { protect } = require('../middlewares/auth');
 
+/**
+ * @swagger
+ * tags:
+ *   name: Dashboard
+ *   description: Operational overview and statistics
+ */
+
 // All routes require authentication
 router.use(protect);
 
-// @route   GET /api/dashboard/overview
-// @desc    Get dashboard overview
-// @access  Private
+/**
+ * @swagger
+ * /api/dashboard/overview:
+ *   get:
+ *     summary: Get dashboard overview
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard overview data
+ */
 router.get('/overview', dashboardController.getDashboardOverview);
 
-// @route   GET /api/dashboard/orders
-// @desc    Get order statistics
-// @access  Private
+/**
+ * @swagger
+ * /api/dashboard/orders:
+ *   get:
+ *     summary: Get order statistics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Order statistics
+ */
 router.get('/orders', dashboardController.getOrderStatistics);
 
-// @route   GET /api/dashboard/production
-// @desc    Get production statistics
-// @access  Private
+/**
+ * @swagger
+ * /api/dashboard/production:
+ *   get:
+ *     summary: Get production statistics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Production statistics
+ */
 router.get('/production', dashboardController.getProductionStatistics);
 
-// @route   GET /api/dashboard/inventory
-// @desc    Get inventory statistics
-// @access  Private
+/**
+ * @swagger
+ * /api/dashboard/inventory:
+ *   get:
+ *     summary: Get inventory statistics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Inventory statistics
+ */
 router.get('/inventory', dashboardController.getInventoryStatistics);
 
-// @route   GET /api/dashboard/shipments
-// @desc    Get shipment statistics
-// @access  Private
+/**
+ * @swagger
+ * /api/dashboard/shipments:
+ *   get:
+ *     summary: Get shipment statistics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Shipment statistics
+ */
 router.get('/shipments', dashboardController.getShipmentStatistics);
 
 module.exports = router;

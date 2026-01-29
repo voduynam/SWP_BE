@@ -85,6 +85,63 @@ router.use(protect);
 // @access  Private/Admin
 router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
 
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User details
+ *   put:
+ *     summary: Update user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               full_name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User updated
+ *   delete:
+ *     summary: Delete user (Soft delete)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deleted
+ */
 // @route   GET /api/users/:id
 // @desc    Get user by ID
 // @access  Private

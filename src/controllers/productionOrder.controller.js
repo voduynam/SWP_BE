@@ -97,6 +97,17 @@ exports.createProductionOrder = asyncHandler(async (req, res) => {
   const orderCount = await ProductionOrder.countDocuments();
   const prodOrderNo = `PO-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(orderCount + 1).padStart(2, '0')}`;
 
+  // Validate recipes are ACTIVE
+  const Recipe = require('../models/Recipe');
+  for (const line of lines) {
+    const recipe = await Recipe.findById(line.recipe_id);
+    if (!recipe || recipe.status !== 'ACTIVE') {
+      return res.status(400).json(
+        ApiResponse.error(`Recipe ${line.recipe_id} is not active or not found`, 400)
+      );
+    }
+  }
+
   // Create production order
   const order = await ProductionOrder.create({
     _id: `po_${Date.now()}`,
@@ -187,6 +198,54 @@ exports.recordConsumption = asyncHandler(async (req, res) => {
     qty,
     uom_id
   });
+
+  // --- [BACKFLUSHING LOGIC] ---
+  const InventoryBalance = require('../models/InventoryBalance');
+  const InventoryTransaction = require('../models/InventoryTransaction');
+  const ProductionOrder = require('../models/ProductionOrder');
+  const Location = require('../models/Location');
+
+  // Find the production order to get the location (Standard: Central Kitchen Raw Material WH)
+  const orderLineWithOrder = await ProductionOrderLine.findById(prod_order_line_id).populate('prod_order_id');
+
+  // For Central Kitchen, we usually use the RAW MATERIAL location of the CK
+  // Logic: Find location of type 'WH_RAW' for the CK org unit
+  const orgUnitId = orderLineWithOrder.prod_order_id.created_by.org_unit_id; // Or a fixed CK Org Unit
+  const rawLocation = await Location.findOne({
+    org_unit_id: orderLineWithOrder.prod_order_id.created_by.org_unit_id,
+    code: /RAW/i
+  }) || await Location.findOne({ code: /RAW/i });
+
+  if (rawLocation) {
+    // Update inventory balance
+    const balanceFilter = {
+      location_id: rawLocation._id,
+      item_id: material_item_id,
+      lot_id: lot_id || null
+    };
+
+    let balance = await InventoryBalance.findOne(balanceFilter);
+    if (balance) {
+      balance.qty_on_hand -= qty;
+      balance.updated_at = new Date();
+      await balance.save();
+
+      // Record transaction
+      await InventoryTransaction.create({
+        txn_time: new Date(),
+        location_id: rawLocation._id,
+        item_id: material_item_id,
+        lot_id: lot_id || null,
+        qty: -qty, // Negative for consumption
+        uom_id,
+        txn_type: 'CONSUMPTION',
+        ref_type: 'PRODUCTION_ORDER',
+        ref_id: orderLineWithOrder.prod_order_id._id,
+        created_by: req.user.id,
+        notes: `Auto-deduct from Production consumption of ${orderLineWithOrder.prod_order_id.prod_order_no}`
+      });
+    }
+  }
 
   const populatedConsumption = await ProductionConsumption.findById(consumption._id)
     .populate('material_item_id', 'sku name')

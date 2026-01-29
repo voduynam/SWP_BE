@@ -78,17 +78,161 @@ const { protect, authorize } = require('../middlewares/auth');
 router.use(protect);
 
 // ========== UOM Routes ==========
+
+/**
+ * @swagger
+ * /api/master-data/uoms:
+ *   get:
+ *     summary: Get all units of measure
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of UOMs
+ */
 router.get('/uoms', masterDataController.getUOMs);
+
+/**
+ * @swagger
+ * /api/master-data/uoms/{id}:
+ *   get:
+ *     summary: Get single unit of measure
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: UOM details
+ */
 router.get('/uoms/:id', masterDataController.getUOM);
 
 // ========== Category Routes ==========
+
+/**
+ * @swagger
+ * /api/master-data/categories:
+ *   get:
+ *     summary: Get all categories
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of categories
+ */
 router.get('/categories', masterDataController.getCategories);
+
+/**
+ * @swagger
+ * /api/master-data/categories/{id}:
+ *   get:
+ *     summary: Get single category
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Category details
+ */
 router.get('/categories/:id', masterDataController.getCategory);
+
+/**
+ * @swagger
+ * /api/master-data/categories:
+ *   post:
+ *     summary: Create new category
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Category created
+ */
 router.post('/categories', authorize('MANAGER', 'ADMIN'), masterDataController.createCategory);
 
 // ========== Supplier Routes ==========
+
+/**
+ * @swagger
+ * /api/master-data/suppliers:
+ *   get:
+ *     summary: Get all suppliers
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of suppliers
+ */
 router.get('/suppliers', masterDataController.getSuppliers);
+
+/**
+ * @swagger
+ * /api/master-data/suppliers/{id}:
+ *   get:
+ *     summary: Get single supplier
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Supplier details
+ */
 router.get('/suppliers/:id', masterDataController.getSupplier);
+
+/**
+ * @swagger
+ * /api/master-data/suppliers:
+ *   post:
+ *     summary: Create new supplier
+ *     tags: [Master Data]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               contact_person:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Supplier created
+ */
 router.post('/suppliers', authorize('MANAGER', 'ADMIN'), masterDataController.createSupplier);
 
 // ========== Org Unit Routes ==========

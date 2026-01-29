@@ -203,3 +203,122 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
     ApiResponse.success(populatedShipment, 'Shipment status updated successfully')
   );
 });
+
+// @desc    Confirm shipment dispatch (Deduct stock from CK)
+// @route   PUT /api/shipments/:id/dispatch
+// @access  Private (Kitchen Staff, Manager, Admin)
+exports.confirmDispatch = asyncHandler(async (req, res) => {
+  const shipment = await Shipment.findById(req.params.id);
+  if (!shipment) {
+    return res.status(404).json(
+      ApiResponse.error('Shipment not found', 404)
+    );
+  }
+
+  if (shipment.status === 'SHIPPED' || shipment.status === 'IN_TRANSIT' || shipment.status === 'DELIVERED') {
+    return res.status(400).json(
+      ApiResponse.error('Shipment already dispatched', 400)
+    );
+  }
+
+  const shipmentLines = await ShipmentLine.find({ shipment_id: shipment._id });
+  const InventoryBalance = require('../models/InventoryBalance');
+  const InventoryTransaction = require('../models/InventoryTransaction');
+
+  // Loop through lines and associated lots to deduct stock
+  for (const line of shipmentLines) {
+    const shipmentLineLots = await ShipmentLineLot.find({ shipment_line_id: line._id });
+
+    // If no lots are assigned, we use the base item balance (assuming tracking_type is NONE)
+    if (shipmentLineLots.length === 0) {
+      let balance = await InventoryBalance.findOne({
+        location_id: shipment.from_location_id,
+        item_id: line.item_id,
+        lot_id: null
+      });
+
+      if (!balance || balance.qty_on_hand < line.qty) {
+        return res.status(400).json(
+          ApiResponse.error(`Insufficient stock for item ${line.item_id} at source location`, 400)
+        );
+      }
+
+      balance.qty_on_hand -= line.qty;
+      await balance.save();
+
+      // Record transaction
+      await InventoryTransaction.create({
+        txn_time: new Date(),
+        location_id: shipment.from_location_id,
+        item_id: line.item_id,
+        lot_id: null,
+        qty: -line.qty,
+        uom_id: line.uom_id,
+        txn_type: 'TRANSFER_OUT',
+        ref_type: 'SHIPMENT',
+        ref_id: shipment._id,
+        created_by: req.user.id
+      });
+    } else {
+      for (const lineLot of shipmentLineLots) {
+        let balance = await InventoryBalance.findOne({
+          location_id: shipment.from_location_id,
+          item_id: line.item_id,
+          lot_id: lineLot.lot_id
+        });
+
+        if (!balance || balance.qty_on_hand < lineLot.qty) {
+          return res.status(400).json(
+            ApiResponse.error(`Insufficient stock for item ${line.item_id} (Lot: ${lineLot.lot_id}) at source location`, 400)
+          );
+        }
+
+        balance.qty_on_hand -= lineLot.qty;
+        await balance.save();
+
+        // Record transaction
+        await InventoryTransaction.create({
+          txn_time: new Date(),
+          location_id: shipment.from_location_id,
+          item_id: line.item_id,
+          lot_id: lineLot.lot_id,
+          qty: -lineLot.qty,
+          uom_id: line.uom_id,
+          txn_type: 'TRANSFER_OUT',
+          ref_type: 'SHIPMENT',
+          ref_id: shipment._id,
+          created_by: req.user.id
+        });
+      }
+    }
+  }
+
+  // Update status
+  shipment.status = 'SHIPPED';
+  shipment.updated_at = new Date();
+  await shipment.save();
+
+  // Also update order status if it was PROCESSING
+  const InternalOrder = require('../models/InternalOrder');
+  const order = await InternalOrder.findById(shipment.order_id);
+  if (order && order.status === 'PROCESSING') {
+    order.status = 'SHIPPED';
+    await order.save();
+  }
+
+  // --- [NOTIFICATION TRIGGER] ---
+  const notificationController = require('./notification.controller');
+  await notificationController.createNotificationInternal({
+    recipient_role: 'STORE_STAFF',
+    recipient_id: order ? order.created_by : null,
+    title: 'Hàng đã xuất kho',
+    message: `Chuyến hàng ${shipment.shipment_no} đã được xác nhận xuất kho và đang được giao đến bạn.`,
+    type: 'SUCCESS',
+    ref_type: 'SHIPMENT',
+    ref_id: shipment._id
+  });
+
+  return res.status(200).json(
+    ApiResponse.success(shipment, 'Shipment dispatched and CK stock deducted')
+  );
+});

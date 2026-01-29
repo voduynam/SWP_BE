@@ -38,6 +38,10 @@ const internalOrderSchema = new mongoose.Schema({
     type: String,
     default: 'VND'
   },
+  is_urgent: {
+    type: Boolean,
+    default: false
+  },
   created_at: {
     type: Date,
     default: Date.now

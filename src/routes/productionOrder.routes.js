@@ -3,37 +3,199 @@ const router = express.Router();
 const productionOrderController = require('../controllers/productionOrder.controller');
 const { protect, authorize } = require('../middlewares/auth');
 
+/**
+ * @swagger
+ * tags:
+ *   name: Production Orders
+ *   description: Central Kitchen production management
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ProductionOrder:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *         production_no:
+ *           type: string
+ *         order_date:
+ *           type: string
+ *           format: date
+ *         status:
+ *           type: string
+ *           enum: [PLANNED, RELEASED, IN_PROGRESS, COMPLETED, CANCELLED]
+ *         location_id:
+ *           type: string
+ *     ProductionLine:
+ *       type: object
+ *       properties:
+ *         item_id:
+ *           type: string
+ *         recipe_id:
+ *           type: string
+ *         qty_planned:
+ *           type: number
+ */
+
 // All routes require authentication
 router.use(protect);
 
-// @route   GET /api/production-orders
-// @desc    Get all production orders
-// @access  Private
+/**
+ * @swagger
+ * /api/production-orders:
+ *   get:
+ *     summary: Get all production orders
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of production orders
+ */
 router.get('/', productionOrderController.getProductionOrders);
 
-// @route   GET /api/production-orders/:id
-// @desc    Get single production order with lines
-// @access  Private
+/**
+ * @swagger
+ * /api/production-orders/{id}:
+ *   get:
+ *     summary: Get single production order with lines
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Production order details
+ */
 router.get('/:id', productionOrderController.getProductionOrder);
 
-// @route   POST /api/production-orders
-// @desc    Create production order
-// @access  Private (Chef, Manager, Admin)
+/**
+ * @swagger
+ * /api/production-orders:
+ *   post:
+ *     summary: Create production order
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               lines:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/ProductionLine'
+ *     responses:
+ *       201:
+ *         description: Production order created
+ */
 router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.createProductionOrder);
 
-// @route   PUT /api/production-orders/:id/status
-// @desc    Update production order status
-// @access  Private (Chef, Manager, Admin)
+/**
+ * @swagger
+ * /api/production-orders/{id}/status:
+ *   put:
+ *     summary: Update production order status
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PLANNED, RELEASED, IN_PROGRESS, COMPLETED, CANCELLED]
+ *     responses:
+ *       200:
+ *         description: Status updated
+ */
 router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.updateProductionOrderStatus);
 
-// @route   POST /api/production-orders/:id/consumption
-// @desc    Record production consumption
-// @access  Private (Chef, Manager, Admin)
+/**
+ * @swagger
+ * /api/production-orders/{id}/consumption:
+ *   post:
+ *     summary: Record production consumption
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               material_item_id:
+ *                 type: string
+ *               qty:
+ *                 type: number
+ *               lot_id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Consumption recorded
+ */
 router.post('/:id/consumption', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.recordConsumption);
 
-// @route   POST /api/production-orders/:id/output
-// @desc    Record production output
-// @access  Private (Chef, Manager, Admin)
+/**
+ * @swagger
+ * /api/production-orders/{id}/output:
+ *   post:
+ *     summary: Record production output
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               item_id:
+ *                 type: string
+ *               qty:
+ *                 type: number
+ *               lot_code:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Output recorded
+ */
 router.post('/:id/output', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.recordOutput);
 
 module.exports = router;
