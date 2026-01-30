@@ -13,7 +13,7 @@ const inventoryRoutes = require('./inventory.routes');
 const recipeRoutes = require('./recipe.routes');
 const lotRoutes = require('./lot.routes');
 const masterDataRoutes = require('./masterData.routes');
-const returnRequestRoutes = require('./returnRequest.routes');
+// const returnRequestRoutes = require('./returnRequest.routes'); // DISABLED - Not needed for current project
 const alertRoutes = require('./alert.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const deliveryRouteRoutes = require('./deliveryRoute.routes');
@@ -34,7 +34,7 @@ router.use('/inventory', inventoryRoutes);
 router.use('/recipes', recipeRoutes);
 router.use('/lots', lotRoutes);
 router.use('/master-data', masterDataRoutes);
-router.use('/return-requests', returnRequestRoutes);
+// router.use('/return-requests', returnRequestRoutes); // DISABLED - Not needed for current project
 router.use('/alerts', alertRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/delivery-routes', deliveryRouteRoutes);
@@ -60,7 +60,7 @@ router.get('/', (req, res) => {
       recipes: '/api/recipes',
       lots: '/api/lots',
       'master-data': '/api/master-data',
-      'return-requests': '/api/return-requests',
+      // 'return-requests': '/api/return-requests', // DISABLED - Not needed for current project
       alerts: '/api/alerts',
       dashboard: '/api/dashboard',
       'delivery-routes': '/api/delivery-routes',

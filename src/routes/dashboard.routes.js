@@ -6,7 +6,7 @@ const { protect } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: 11. Dashboard & Analytics
+ *   name: 10. Dashboard & Analytics
  *   description: Operational overview and statistics
  */
 
@@ -18,7 +18,7 @@ router.use(protect);
  * /api/dashboard/overview:
  *   get:
  *     summary: Get dashboard overview
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -32,7 +32,7 @@ router.get('/overview', dashboardController.getDashboardOverview);
  * /api/dashboard/orders:
  *   get:
  *     summary: Get order statistics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -46,7 +46,7 @@ router.get('/orders', dashboardController.getOrderStatistics);
  * /api/dashboard/production:
  *   get:
  *     summary: Get production statistics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -60,7 +60,7 @@ router.get('/production', dashboardController.getProductionStatistics);
  * /api/dashboard/inventory:
  *   get:
  *     summary: Get inventory statistics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -74,7 +74,7 @@ router.get('/inventory', dashboardController.getInventoryStatistics);
  * /api/dashboard/shipments:
  *   get:
  *     summary: Get shipment statistics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:

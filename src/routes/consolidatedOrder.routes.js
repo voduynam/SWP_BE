@@ -10,7 +10,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: 9. Supply Coordination
+ *   name: 8. Supply Coordination
  *   description: Order consolidation and kitchen planning
  */
 
@@ -22,7 +22,7 @@ router.use(protect);
  * /api/consolidated-orders:
  *   get:
  *     summary: Get all consolidated orders
- *     tags: [9. Supply Coordination]
+ *     tags: [8. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -37,7 +37,7 @@ router.route('/')
  * /api/consolidated-orders/generate:
  *   post:
  *     summary: Generate consolidated summary for a date range
- *     tags: [9. Supply Coordination]
+ *     tags: [8. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -65,7 +65,7 @@ router.route('/generate')
  * /api/consolidated-orders/{date}:
  *   get:
  *     summary: Get consolidated order by date
- *     tags: [9. Supply Coordination]
+ *     tags: [8. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:

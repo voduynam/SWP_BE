@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: 8. Inventory Management
+ *   name: 7. Inventory Management
  *   description: Stock management and tracking
  */
 
@@ -51,7 +51,7 @@ router.use(protect);
  * /api/inventory/balances:
  *   get:
  *     summary: Get inventory balances
- *     tags: [8. Inventory Management]
+ *     tags: [7. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -74,7 +74,7 @@ router.get('/balances', inventoryController.getInventoryBalances);
  * /api/inventory/transactions:
  *   get:
  *     summary: Get inventory transactions
- *     tags: [8. Inventory Management]
+ *     tags: [7. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -99,7 +99,7 @@ router.get('/transactions', inventoryController.getInventoryTransactions);
  * /api/inventory/summary:
  *   get:
  *     summary: Get inventory summary by location
- *     tags: [8. Inventory Management]
+ *     tags: [7. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -113,7 +113,7 @@ router.get('/summary', inventoryController.getInventorySummary);
  * /api/inventory/adjust:
  *   post:
  *     summary: Adjust inventory
- *     tags: [8. Inventory Management]
+ *     tags: [7. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     requestBody:

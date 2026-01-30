@@ -13,7 +13,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: 11. Dashboard & Analytics
+ *   name: 10. Dashboard & Analytics
  *   description: KPI tracking and analytical dashboard data
  */
 
@@ -26,7 +26,7 @@ router.use(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'));
  * /api/performance-metrics/dashboard:
  *   get:
  *     summary: Get dashboard KPIs and metrics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -41,7 +41,7 @@ router.route('/dashboard')
  * /api/performance-metrics/calculate/delivery:
  *   post:
  *     summary: Calculate delivery performance metrics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -56,7 +56,7 @@ router.route('/calculate/delivery')
  * /api/performance-metrics/calculate/fulfillment:
  *   post:
  *     summary: Calculate order fulfillment metrics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -71,7 +71,7 @@ router.route('/calculate/fulfillment')
  * /api/performance-metrics/calculate/exceptions:
  *   post:
  *     summary: Calculate exception handling metrics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -86,7 +86,7 @@ router.route('/calculate/exceptions')
  * /api/performance-metrics:
  *   get:
  *     summary: Get all metrics
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -101,7 +101,7 @@ router.route('/')
  * /api/performance-metrics/{type}:
  *   get:
  *     summary: Get metrics by type
- *     tags: [11. Dashboard & Analytics]
+ *     tags: [10. Dashboard & Analytics]
  *     security:
  *       - bearerAuth: []
  *     parameters:

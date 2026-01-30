@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: 12. User Management
+ *   name: 11. User Management
  *   description: User management APIs (Admin only)
  */
 
@@ -35,7 +35,7 @@ router.use(protect);
  * /api/users:
  *   get:
  *     summary: Get all users (Admin/Manager only)
- *     tags: [12. User Management]
+ *     tags: [11. User Management]
  *     description: Retrieve paginated list of all users with their roles
  *     parameters:
  *       - in: query
@@ -90,7 +90,7 @@ router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID
- *     tags: [12. User Management]
+ *     tags: [11. User Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -104,7 +104,7 @@ router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
  *         description: User details
  *   put:
  *     summary: Update user profile
- *     tags: [12. User Management]
+ *     tags: [11. User Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -129,7 +129,7 @@ router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
  *         description: User updated
  *   delete:
  *     summary: Delete user (Soft delete)
- *     tags: [12. User Management]
+ *     tags: [11. User Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -162,7 +162,7 @@ router.delete('/:id', authorize('ADMIN'), userController.deleteUser);
  * /api/users/{id}/roles:
  *   post:
  *     summary: Assign roles to user (Admin only)
- *     tags: [12. User Management]
+ *     tags: [11. User Management]
  *     description: Assign one or more roles to a user
  *     parameters:
  *       - in: path
@@ -220,7 +220,7 @@ router.delete('/:id', authorize('ADMIN'), userController.deleteUser);
  *         description: Forbidden - Admin access required
  *   delete:
  *     summary: Remove roles from user (Admin only)
- *     tags: [12. User Management]
+ *     tags: [11. User Management]
  *     description: Remove one or more roles from a user
  *     parameters:
  *       - in: path
