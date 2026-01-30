@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Return Requests
+ *   name: 7. Return Flow
  *   description: Managing returns from stores to Central Kitchen
  */
 
@@ -18,7 +18,7 @@ router.use(protect);
  * /api/return-requests:
  *   get:
  *     summary: Get all return requests
- *     tags: [Return Requests]
+ *     tags: [7. Return Flow]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -32,7 +32,7 @@ router.get('/', returnRequestController.getReturnRequests);
  * /api/return-requests/{id}:
  *   get:
  *     summary: Get single return request with lines
- *     tags: [Return Requests]
+ *     tags: [7. Return Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -52,7 +52,7 @@ router.get('/:id', returnRequestController.getReturnRequest);
  * /api/return-requests:
  *   post:
  *     summary: Create new return request
- *     tags: [Return Requests]
+ *     tags: [7. Return Flow]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -81,7 +81,7 @@ router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), returnRequestCont
  * /api/return-requests/{id}/status:
  *   put:
  *     summary: Update return request status
- *     tags: [Return Requests]
+ *     tags: [7. Return Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -111,7 +111,7 @@ router.put('/:id/status', authorize('MANAGER', 'ADMIN'), returnRequestController
  * /api/return-requests/{id}/process:
  *   put:
  *     summary: Process return and update inventory
- *     tags: [Return Requests]
+ *     tags: [7. Return Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:

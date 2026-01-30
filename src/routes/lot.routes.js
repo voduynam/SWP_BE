@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Lots
+ *   name: 8. Inventory Management
  *   description: Batch and lot tracking for inventory items
  */
 
@@ -18,7 +18,7 @@ router.use(protect);
  * /api/lots:
  *   get:
  *     summary: Get all lots
- *     tags: [Lots]
+ *     tags: [8. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -32,7 +32,7 @@ router.get('/', lotController.getLots);
  * /api/lots/{id}:
  *   get:
  *     summary: Get single lot details
- *     tags: [Lots]
+ *     tags: [8. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -52,7 +52,7 @@ router.get('/:id', lotController.getLot);
  * /api/lots:
  *   post:
  *     summary: Create new lot/batch
- *     tags: [Lots]
+ *     tags: [8. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -78,7 +78,7 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), lotController.createLot)
  * /api/lots/{id}:
  *   put:
  *     summary: Update lot details
- *     tags: [Lots]
+ *     tags: [8. Inventory Management]
  *     security:
  *       - bearerAuth: []
  *     parameters:

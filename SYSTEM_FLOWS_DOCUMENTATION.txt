@@ -1,0 +1,2219 @@
+================================================================================
+HỆ THỐNG QUẢN LÝ CHUỖI FRANCHISE - BẾP TRUNG TÂM & CỬA HÀNG
+CENTRAL KITCHEN & FRANCHISE STORE MANAGEMENT SYSTEM
+================================================================================
+
+Ngày tạo: 30/01/2026
+Phiên bản: 1.0.0
+Base URL: http://localhost:5001/api
+
+================================================================================
+MỤC LỤC
+================================================================================
+
+PHẦN I: TỔNG QUAN HỆ THỐNG
+1. Giới thiệu hệ thống
+2. Mô hình kinh doanh
+3. Vai trò người dùng (Roles)
+4. Kiến trúc hệ thống
+
+PHẦN II: CÁC FLOW NGHIỆP VỤ CHÍNH
+5. Flow 1: Đặt hàng nội bộ (Internal Order Flow)
+6. Flow 2: Sản xuất (Production Flow)
+7. Flow 3: Giao hàng (Shipment Flow)
+8. Flow 4: Nhận hàng (Goods Receipt Flow)
+9. Flow 5: Trả hàng (Return Request Flow)
+10. Flow 6: Quản lý tồn kho (Inventory Management Flow)
+11. Flow 7: Điều phối cung ứng (Supply Coordination Flow)
+12. Flow 8: Cảnh báo & Thông báo (Alert & Notification Flow)
+
+PHẦN III: API ENDPOINTS CHI TIẾT
+13. Authentication APIs
+14. Master Data APIs
+15. Order Management APIs
+16. Production APIs
+17. Logistics APIs
+18. Inventory APIs
+19. Dashboard & Analytics APIs
+
+PHẦN IV: HƯỚNG DẪN SỬ DỤNG THEO VAI TRÒ
+20. Franchise Store Staff (Nhân viên cửa hàng)
+21. Central Kitchen Staff (Nhân viên bếp trung tâm)
+22. Supply Coordinator (Điều phối cung ứng)
+23. Manager (Quản lý vận hành)
+24. Admin (Quản trị hệ thống)
+
+
+================================================================================
+PHẦN I: TỔNG QUAN HỆ THỐNG
+================================================================================
+
+1. GIỚI THIỆU HỆ THỐNG
+--------------------------------------------------------------------------------
+Hệ thống quản lý chuỗi cung ứng từ bếp trung tâm (Central Kitchen) đến các 
+cửa hàng franchise, được xây dựng trên nền tảng:
+- Backend: Node.js + Express.js
+- Database: MongoDB
+- Real-time: Socket.io
+- Documentation: Swagger UI
+
+Mục tiêu:
+✓ Đồng bộ thông tin tồn kho, đơn hàng và kế hoạch sản xuất
+✓ Dự báo nhu cầu chính xác, giảm thiếu hụt/dư thừa nguyên liệu
+✓ Kiểm soát chất lượng, hạn sử dụng và truy xuất nguồn gốc
+✓ Minh bạch quy trình giao nhận giữa bếp trung tâm và cửa hàng
+✓ Theo dõi hiệu quả vận hành toàn chuỗi
+
+2. MÔ HÌNH KINH DOANH
+--------------------------------------------------------------------------------
+Trong mô hình chuỗi franchise:
+
+BẾP TRUNG TÂM (Central Kitchen):
+- Sản xuất và sơ chế nguyên liệu/thành phẩm
+- Cung ứng cho nhiều cửa hàng
+- Quản lý công thức sản xuất (recipes)
+- Kiểm soát chất lượng đầu ra
+- Quản lý tồn kho nguyên liệu và thành phẩm
+
+CỬA HÀNG FRANCHISE (Franchise Store):
+- Đặt hàng nguyên liệu/thành phẩm từ bếp trung tâm
+- Nhận hàng và kiểm tra chất lượng
+- Quản lý tồn kho tại cửa hàng
+- Phản hồi chất lượng và trả hàng nếu cần
+
+QUY TRÌNH HOẠT ĐỘNG:
+Cửa hàng → Đặt hàng → Bếp trung tâm → Sản xuất → Giao hàng → Cửa hàng nhận hàng
+
+3. VAI TRÒ NGƯỜI DÙNG (ROLES)
+--------------------------------------------------------------------------------
+
+ADMIN (Quản trị hệ thống)
+- Quản lý người dùng và phân quyền
+- Cấu hình hệ thống (đơn vị tính, quy trình, tham số)
+- Quản lý danh mục cửa hàng franchise và bếp trung tâm
+- Báo cáo tổng hợp toàn hệ thống
+API Access: Toàn bộ hệ thống
+
+MANAGER (Quản lý vận hành)
+- Quản lý danh mục sản phẩm, công thức và định mức nguyên liệu
+- Quản lý tồn kho bếp trung tâm và cửa hàng
+- Theo dõi hiệu suất sản xuất, phân phối và bán hàng
+- Thống kê, báo cáo chi phí, hao hụt và hiệu quả vận hành
+- Phê duyệt đơn hàng và yêu cầu trả hàng
+API Access: Master Data, Orders, Production, Inventory, Dashboard
+
+CHEF (Nhân viên bếp trung tâm - Central Kitchen Staff)
+- Tiếp nhận và xử lý đơn đặt hàng từ các cửa hàng
+- Lập kế hoạch sản xuất theo nhu cầu tổng hợp
+- Cập nhật trạng thái sản xuất và xuất kho
+- Quản lý nguyên liệu đầu vào, hạn sử dụng và lô sản xuất
+- Tạo shipment và giao hàng
+API Access: Orders (view/approve), Production, Shipments, Inventory (kitchen)
+
+SUPPLY_COORDINATOR (Điều phối cung ứng)
+- Tổng hợp và phân loại đơn đặt hàng từ các cửa hàng
+- Điều phối sản xuất và phân phối hàng hóa
+- Lập lịch giao hàng và theo dõi tiến độ vận chuyển
+- Xử lý các vấn đề phát sinh (thiếu hàng, giao trễ, hủy đơn)
+- Quản lý tuyến đường giao hàng
+API Access: Orders, Shipments, Delivery Routes, Exceptions, Performance Metrics
+
+STORE_STAFF (Nhân viên cửa hàng - Franchise Store Staff)
+- Tạo đơn đặt hàng nguyên liệu/bán thành phẩm từ bếp trung tâm
+- Theo dõi trạng thái xử lý và giao hàng của đơn đặt
+- Xác nhận đã nhận hàng và phản hồi chất lượng
+- Xem tồn kho hiện tại tại cửa hàng
+- Tạo yêu cầu trả hàng
+API Access: Orders (create/view), Goods Receipts, Return Requests, Inventory (store)
+
+
+4. KIẾN TRÚC HỆ THỐNG
+--------------------------------------------------------------------------------
+
+DATABASE MODELS (38 Collections):
+├── User Management
+│   ├── AppUser - Thông tin người dùng
+│   ├── Role - Vai trò hệ thống
+│   └── UserRole - Mapping user-role (many-to-many)
+│
+├── Master Data
+│   ├── OrgUnit - Đơn vị tổ chức (Kitchen/Store)
+│   ├── Location - Vị trí kho
+│   ├── Category - Danh mục sản phẩm
+│   ├── Supplier - Nhà cung cấp
+│   ├── UOM - Đơn vị tính
+│   └── ItemUOMConversion - Quy đổi đơn vị
+│
+├── Product Management
+│   └── Item - Sản phẩm (RAW/FINISHED)
+│
+├── Order Management
+│   ├── InternalOrder - Đơn hàng nội bộ
+│   ├── InternalOrderLine - Chi tiết đơn hàng
+│   └── OrderFulfillment - Theo dõi fulfillment
+│
+├── Production Management
+│   ├── ProductionOrder - Lệnh sản xuất
+│   ├── ProductionOrderLine - Chi tiết sản xuất
+│   ├── ProductionConsumption - Tiêu hao nguyên liệu
+│   ├── ProductionOutputLot - Sản phẩm đầu ra
+│   ├── Recipe - Công thức sản xuất
+│   └── RecipeLine - Chi tiết công thức
+│
+├── Logistics
+│   ├── Shipment - Lô hàng
+│   ├── ShipmentLine - Chi tiết lô hàng
+│   ├── ShipmentLineLot - Lot tracking
+│   ├── GoodsReceipt - Phiếu nhận hàng
+│   ├── GoodsReceiptLine - Chi tiết nhận hàng
+│   ├── DeliveryRoute - Tuyến giao hàng
+│   └── RouteStop - Điểm dừng trên tuyến
+│
+├── Inventory
+│   ├── InventoryBalance - Số dư tồn kho
+│   ├── InventoryTransaction - Lịch sử giao dịch
+│   └── Lot - Quản lý lô hàng
+│
+├── Returns
+│   ├── ReturnRequest - Yêu cầu trả hàng
+│   └── ReturnRequestLine - Chi tiết trả hàng
+│
+├── Supply Coordination
+│   ├── ConsolidatedOrderSummary - Tổng hợp đơn hàng
+│   ├── DeliverySchedule - Lịch giao hàng
+│   ├── ExceptionLog - Nhật ký sự cố
+│   └── PerformanceMetrics - Chỉ số hiệu suất
+│
+└── Notifications
+    └── Notification - Thông báo hệ thống
+
+API STRUCTURE:
+/api
+├── /auth - Authentication & Authorization
+├── /users - User Management
+├── /master-data - Master Data (Categories, Suppliers, OrgUnits, Locations, Roles, UOMs)
+├── /items - Product Management
+├── /recipes - Recipe Management
+├── /lots - Lot Management
+├── /internal-orders - Internal Order Management
+├── /production-orders - Production Order Management
+├── /shipments - Shipment Management
+├── /goods-receipts - Goods Receipt Management
+├── /inventory - Inventory Management
+├── /return-requests - Return Request Management
+├── /delivery-routes - Delivery Route Management
+├── /consolidated-orders - Consolidated Order Management
+├── /exceptions - Exception Management
+├── /performance-metrics - Performance Metrics
+├── /alerts - Alert System
+├── /dashboard - Dashboard & Analytics
+└── /notifications - Notification Management
+
+
+================================================================================
+PHẦN II: CÁC FLOW NGHIỆP VỤ CHÍNH
+================================================================================
+
+5. FLOW 1: ĐẶT HÀNG NỘI BỘ (INTERNAL ORDER FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Cửa hàng franchise đặt hàng nguyên liệu/thành phẩm từ bếp trung tâm.
+
+TRẠNG THÁI ĐơN HÀNG:
+DRAFT → SUBMITTED → APPROVED → PROCESSING → SHIPPED → RECEIVED → (CANCELLED)
+
+QUY TRÌNH CHI TIẾT:
+
+BƯỚC 1: Tạo đơn hàng (Store Staff)
+- API: POST /api/internal-orders
+- Input: store_org_unit_id, order_date, lines[]
+- Output: Order với status = DRAFT
+- Người thực hiện: STORE_STAFF
+- Mô tả: Nhân viên cửa hàng tạo đơn đặt hàng, chọn sản phẩm và số lượng
+
+BƯỚC 2: Gửi đơn hàng (Store Staff)
+- API: PUT /api/internal-orders/:id/status
+- Input: { status: "SUBMITTED" }
+- Output: Order status = SUBMITTED
+- Người thực hiện: STORE_STAFF
+- Mô tả: Sau khi kiểm tra, nhân viên gửi đơn hàng để bếp trung tâm xử lý
+- Lưu ý: Không thể chỉnh sửa đơn hàng sau khi SUBMITTED
+
+BƯỚC 3: Phê duyệt đơn hàng (Kitchen Staff/Manager)
+- API: PUT /api/internal-orders/:id/status
+- Input: { status: "APPROVED" }
+- Output: Order status = APPROVED
+- Người thực hiện: CHEF hoặc MANAGER
+- Mô tả: Bếp trung tâm xem xét và phê duyệt đơn hàng
+
+BƯỚC 4: Bắt đầu xử lý (Kitchen Staff)
+- API: PUT /api/internal-orders/:id/status
+- Input: { status: "PROCESSING" }
+- Output: Order status = PROCESSING
+- Người thực hiện: CHEF
+- Mô tả: Bếp trung tâm bắt đầu chuẩn bị hàng (có thể cần sản xuất)
+
+BƯỚC 5: Tạo lô hàng giao (Kitchen Staff)
+- API: POST /api/shipments
+- Input: order_id, from_location_id, to_location_id, lines[] với lots[]
+- Output: Shipment với status = PENDING
+- Người thực hiện: CHEF
+- Mô tả: Tạo shipment, chọn lot cho từng sản phẩm
+- Tự động: Order status → SHIPPED
+
+BƯỚC 6: Xác nhận giao hàng (Kitchen Staff)
+- API: PUT /api/shipments/:id/status
+- Input: { status: "SHIPPED" }
+- Output: Shipment status = SHIPPED
+- Người thực hiện: CHEF
+- Mô tả: Xác nhận hàng đã được giao đi
+
+BƯỚC 7: Tạo phiếu nhận hàng (Store Staff)
+- API: POST /api/goods-receipts
+- Input: shipment_id, received_date, lines[] với qty_received, qty_rejected
+- Output: GoodsReceipt với status = PENDING
+- Người thực hiện: STORE_STAFF
+- Mô tả: Nhân viên cửa hàng kiểm tra và ghi nhận số lượng nhận/từ chối
+
+BƯỚC 8: Xác nhận nhận hàng (Store Staff)
+- API: PUT /api/goods-receipts/:id/confirm
+- Input: { status: "RECEIVED" }
+- Output: GoodsReceipt status = RECEIVED
+- Người thực hiện: STORE_STAFF
+- Mô tả: Xác nhận hoàn tất nhận hàng
+- Tự động:
+  * Cập nhật inventory balance tại cửa hàng
+  * Tạo inventory transaction
+  * Cập nhật order fulfillment
+  * Order status → RECEIVED
+
+API ENDPOINTS:
+- GET /api/internal-orders - Danh sách đơn hàng (có filter)
+- GET /api/internal-orders/:id - Chi tiết đơn hàng
+- POST /api/internal-orders - Tạo đơn hàng mới
+- PUT /api/internal-orders/:id - Cập nhật đơn hàng (chỉ khi DRAFT)
+- PUT /api/internal-orders/:id/status - Cập nhật trạng thái
+- POST /api/internal-orders/:id/lines - Thêm dòng đơn hàng
+- DELETE /api/internal-orders/:id/lines/:lineId - Xóa dòng đơn hàng
+
+VALIDATION:
+- Chỉ STORE_STAFF mới có thể tạo đơn hàng
+- Chỉ có thể edit khi status = DRAFT
+- Phải có ít nhất 1 line item
+- Qty_ordered > 0
+- Unit_price >= 0
+
+
+6. FLOW 2: SẢN XUẤT (PRODUCTION FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Bếp trung tâm lập kế hoạch và thực hiện sản xuất theo công thức (recipe).
+
+TRẠNG THÁI SẢN XUẤT:
+PLANNED → IN_PROGRESS → DONE → (CANCELLED)
+
+QUY TRÌNH CHI TIẾT:
+
+BƯỚC 1: Lập kế hoạch sản xuất (Kitchen Staff)
+- API: POST /api/production-orders
+- Input: planned_start, planned_end, lines[] (item_id, recipe_id, planned_qty)
+- Output: ProductionOrder với status = PLANNED
+- Người thực hiện: CHEF
+- Mô tả: Tạo lệnh sản xuất dựa trên nhu cầu từ đơn hàng hoặc dự báo
+
+BƯỚC 2: Bắt đầu sản xuất (Kitchen Staff)
+- API: PUT /api/production-orders/:id/status
+- Input: { status: "IN_PROGRESS", actual_start: "2024-01-16T08:00:00Z" }
+- Output: ProductionOrder status = IN_PROGRESS
+- Người thực hiện: CHEF
+- Mô tả: Bắt đầu quá trình sản xuất, ghi nhận thời gian bắt đầu thực tế
+
+BƯỚC 3: Ghi nhận tiêu hao nguyên liệu (Kitchen Staff)
+- API: POST /api/production-orders/:id/consumption
+- Input: prod_order_line_id, material_item_id, lot_id, qty, uom_id
+- Output: ProductionConsumption record
+- Người thực hiện: CHEF
+- Mô tả: Ghi nhận nguyên liệu đã sử dụng (có thể gọi nhiều lần)
+- Tự động:
+  * Trừ inventory balance tại kho nguyên liệu
+  * Tạo inventory transaction (PRODUCTION_OUT)
+
+BƯỚC 4: Ghi nhận sản phẩm đầu ra (Kitchen Staff)
+- API: POST /api/production-orders/:id/output
+- Input: prod_order_line_id, lot_id, qty, uom_id
+- Output: ProductionOutputLot record
+- Người thực hiện: CHEF
+- Mô tả: Ghi nhận sản phẩm đã sản xuất (có thể gọi nhiều lần)
+- Tự động:
+  * Cộng inventory balance tại kho thành phẩm
+  * Tạo inventory transaction (PRODUCTION_IN)
+
+BƯỚC 5: Hoàn thành sản xuất (Kitchen Staff)
+- API: PUT /api/production-orders/:id/status
+- Input: { status: "DONE", actual_end: "2024-01-16T16:00:00Z" }
+- Output: ProductionOrder status = DONE
+- Người thực hiện: CHEF
+- Mô tả: Kết thúc sản xuất, ghi nhận thời gian hoàn thành
+- Tự động: Tính toán hiệu suất sản xuất (planned_qty vs actual_qty)
+
+API ENDPOINTS:
+- GET /api/production-orders - Danh sách lệnh sản xuất
+- GET /api/production-orders/:id - Chi tiết lệnh sản xuất
+- POST /api/production-orders - Tạo lệnh sản xuất
+- PUT /api/production-orders/:id - Cập nhật lệnh sản xuất
+- PUT /api/production-orders/:id/status - Cập nhật trạng thái
+- POST /api/production-orders/:id/consumption - Ghi nhận tiêu hao
+- POST /api/production-orders/:id/output - Ghi nhận sản phẩm
+- GET /api/production-orders/:id/consumption - Xem tiêu hao
+- GET /api/production-orders/:id/output - Xem sản phẩm đầu ra
+
+CÔNG THỨC SẢN XUẤT (RECIPE):
+- GET /api/recipes - Danh sách công thức
+- GET /api/recipes/:id - Chi tiết công thức
+- POST /api/recipes - Tạo công thức mới
+- PUT /api/recipes/:id - Cập nhật công thức
+- POST /api/recipes/:id/lines - Thêm nguyên liệu vào công thức
+- DELETE /api/recipes/:id/lines/:lineId - Xóa nguyên liệu
+
+VALIDATION:
+- Chỉ CHEF và MANAGER có quyền tạo production order
+- Recipe phải ở trạng thái ACTIVE
+- Phải có đủ nguyên liệu trong kho
+- Lot nguyên liệu phải chưa hết hạn
+- Qty consumption/output > 0
+
+
+7. FLOW 3: GIAO HÀNG (SHIPMENT FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Bếp trung tâm tạo lô hàng và giao hàng cho cửa hàng.
+
+TRẠNG THÁI SHIPMENT:
+PENDING → SHIPPED → DELIVERED → (CANCELLED)
+
+QUY TRÌNH CHI TIẾT:
+
+BƯỚC 1: Tạo lô hàng (Kitchen Staff)
+- API: POST /api/shipments
+- Input: order_id, from_location_id, to_location_id, ship_date, lines[]
+- Lines bao gồm: order_line_id, item_id, qty, uom_id, lots[] (lot_id, qty)
+- Output: Shipment với status = PENDING
+- Người thực hiện: CHEF
+- Mô tả: Tạo shipment từ order, chọn lot cụ thể cho từng item
+- Tự động:
+  * Order status → SHIPPED
+  * Trừ inventory balance tại kho bếp trung tâm
+  * Tạo inventory transaction (TRANSFER_OUT)
+
+BƯỚC 2: Xác nhận giao hàng (Kitchen Staff)
+- API: PUT /api/shipments/:id/status
+- Input: { status: "SHIPPED" }
+- Output: Shipment status = SHIPPED
+- Người thực hiện: CHEF
+- Mô tả: Xác nhận hàng đã được giao đi
+
+BƯỚC 3: Xác nhận đã giao (Optional - Supply Coordinator)
+- API: PUT /api/shipments/:id/status
+- Input: { status: "DELIVERED" }
+- Output: Shipment status = DELIVERED
+- Người thực hiện: SUPPLY_COORDINATOR
+- Mô tả: Xác nhận hàng đã được giao đến cửa hàng
+
+API ENDPOINTS:
+- GET /api/shipments - Danh sách lô hàng
+- GET /api/shipments/:id - Chi tiết lô hàng
+- POST /api/shipments - Tạo lô hàng
+- PUT /api/shipments/:id - Cập nhật lô hàng
+- PUT /api/shipments/:id/status - Cập nhật trạng thái
+- GET /api/shipments/by-order/:orderId - Lô hàng theo đơn hàng
+
+LOT TRACKING:
+- Mỗi shipment line phải có lot cụ thể
+- Lot phải có đủ số lượng trong kho
+- Lot phải chưa hết hạn
+- Hỗ trợ truy xuất nguồn gốc (traceability)
+
+VALIDATION:
+- Chỉ CHEF có quyền tạo shipment
+- Order phải ở trạng thái APPROVED hoặc PROCESSING
+- Qty shipment <= qty ordered
+- Lot phải tồn tại và có đủ số lượng
+- From_location phải là kho bếp trung tâm
+- To_location phải là kho cửa hàng
+
+8. FLOW 4: NHẬN HÀNG (GOODS RECEIPT FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Cửa hàng nhận hàng từ shipment và cập nhật tồn kho.
+
+TRẠNG THÁI GOODS RECEIPT:
+PENDING → RECEIVED → (REJECTED)
+
+QUY TRÌNH CHI TIẾT:
+
+BƯỚC 1: Tạo phiếu nhận hàng (Store Staff)
+- API: POST /api/goods-receipts
+- Input: shipment_id, received_date, lines[]
+- Lines bao gồm: shipment_line_id, item_id, qty_received, qty_rejected
+- Output: GoodsReceipt với status = PENDING
+- Người thực hiện: STORE_STAFF
+- Mô tả: Nhân viên kiểm tra hàng và ghi nhận số lượng nhận/từ chối
+
+BƯỚC 2: Xác nhận nhận hàng (Store Staff)
+- API: PUT /api/goods-receipts/:id/confirm
+- Input: { status: "RECEIVED" }
+- Output: GoodsReceipt status = RECEIVED
+- Người thực hiện: STORE_STAFF
+- Mô tả: Xác nhận hoàn tất nhận hàng
+- Tự động:
+  * Cộng inventory balance tại kho cửa hàng
+  * Tạo inventory transaction (TRANSFER_IN)
+  * Cập nhật order fulfillment (qty_received_total)
+  * Nếu đủ số lượng: Order status → RECEIVED
+
+API ENDPOINTS:
+- GET /api/goods-receipts - Danh sách phiếu nhận hàng
+- GET /api/goods-receipts/:id - Chi tiết phiếu nhận hàng
+- POST /api/goods-receipts - Tạo phiếu nhận hàng
+- PUT /api/goods-receipts/:id/confirm - Xác nhận nhận hàng
+- GET /api/goods-receipts/by-shipment/:shipmentId - Phiếu nhận theo shipment
+
+KIỂM TRA CHẤT LƯỢNG:
+- Ghi nhận qty_received (số lượng đạt)
+- Ghi nhận qty_rejected (số lượng không đạt)
+- Có thể thêm notes về chất lượng
+- Nếu có qty_rejected, có thể tạo return request
+
+VALIDATION:
+- Chỉ STORE_STAFF có quyền tạo goods receipt
+- Shipment phải ở trạng thái SHIPPED
+- Qty_received + qty_rejected = qty trong shipment
+- Không thể confirm nếu chưa kiểm tra hết hàng
+
+
+9. FLOW 5: TRẢ HÀNG (RETURN REQUEST FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Cửa hàng trả lại hàng lỗi/hết hạn cho bếp trung tâm.
+
+TRẠNG THÁI RETURN REQUEST:
+REQUESTED → APPROVED/REJECTED → PROCESSING → COMPLETED
+
+QUY TRÌNH CHI TIẾT:
+
+BƯỚC 1: Tạo yêu cầu trả hàng (Store Staff)
+- API: POST /api/return-requests
+- Input: store_org_unit_id, source_receipt_id, request_date, lines[]
+- Lines: source_receipt_line_id, item_id, lot_id, qty_requested, 
+         defect_type, disposition, notes
+- Output: ReturnRequest với status = REQUESTED
+- Người thực hiện: STORE_STAFF
+- Mô tả: Tạo yêu cầu trả hàng, chỉ rõ lý do và cách xử lý
+
+DEFECT TYPES (Loại lỗi):
+- DAMAGED: Hư hỏng
+- EXPIRED: Hết hạn
+- WRONG_ITEM: Sai sản phẩm
+- QUALITY_ISSUE: Vấn đề chất lượng
+- OTHER: Lý do khác
+
+DISPOSITION TYPES (Cách xử lý):
+- RESTOCK: Nhập lại kho (hàng còn tốt)
+- SCRAP: Hủy bỏ
+- RETURN_TO_SUPPLIER: Trả lại nhà cung cấp
+
+BƯỚC 2: Phê duyệt/Từ chối (Kitchen Staff/Manager)
+- API: PUT /api/return-requests/:id/status
+- Input: { status: "APPROVED" } hoặc { status: "REJECTED", rejection_reason: "..." }
+- Output: ReturnRequest status = APPROVED/REJECTED
+- Người thực hiện: CHEF hoặc MANAGER
+- Mô tả: Xem xét và quyết định chấp nhận/từ chối yêu cầu
+
+BƯỚC 3: Xử lý trả hàng (Kitchen Staff)
+- API: PUT /api/return-requests/:id/process
+- Input: { process_date: "2024-01-16" }
+- Output: ReturnRequest status = PROCESSING
+- Người thực hiện: CHEF
+- Mô tả: Bắt đầu xử lý hàng trả về
+
+BƯỚC 4: Hoàn thành (Kitchen Staff)
+- API: PUT /api/return-requests/:id/status
+- Input: { status: "COMPLETED" }
+- Output: ReturnRequest status = COMPLETED
+- Người thực hiện: CHEF
+- Mô tả: Hoàn tất xử lý
+- Tự động:
+  * Trừ inventory balance tại cửa hàng
+  * Tạo inventory transaction (RETURN_OUT)
+  * Nếu disposition = RESTOCK: Cộng inventory tại bếp trung tâm
+  * Nếu disposition = SCRAP: Ghi nhận hao hụt
+
+API ENDPOINTS:
+- GET /api/return-requests - Danh sách yêu cầu trả hàng
+- GET /api/return-requests/:id - Chi tiết yêu cầu
+- POST /api/return-requests - Tạo yêu cầu trả hàng
+- PUT /api/return-requests/:id/status - Cập nhật trạng thái
+- PUT /api/return-requests/:id/process - Xử lý trả hàng
+- GET /api/return-requests/by-store/:storeId - Yêu cầu theo cửa hàng
+
+VALIDATION:
+- STORE_STAFF chỉ có thể tạo return request cho cửa hàng của mình
+- Phải có source_receipt_id (từ goods receipt nào)
+- Qty_requested <= qty_received trong goods receipt
+- Lot phải tồn tại trong inventory của cửa hàng
+- Defect_type và disposition là bắt buộc
+
+10. FLOW 6: QUẢN LÝ TỒN KHO (INVENTORY MANAGEMENT FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Theo dõi và quản lý tồn kho tại tất cả các vị trí (bếp trung tâm và cửa hàng).
+
+THÀNH PHẦN CHÍNH:
+
+A. INVENTORY BALANCE (Số dư tồn kho)
+- Theo dõi số lượng tồn kho theo: location, item, lot
+- qty_on_hand: Số lượng hiện có
+- qty_reserved: Số lượng đã đặt trước
+- qty_available: Số lượng có thể sử dụng (on_hand - reserved)
+
+B. INVENTORY TRANSACTION (Giao dịch tồn kho)
+- Ghi nhận mọi thay đổi tồn kho
+- Các loại giao dịch:
+  * TRANSFER_IN: Nhập kho (từ shipment)
+  * TRANSFER_OUT: Xuất kho (tạo shipment)
+  * PRODUCTION_IN: Sản xuất nhập kho
+  * PRODUCTION_OUT: Xuất kho sản xuất
+  * ADJUSTMENT: Điều chỉnh (kiểm kê, hao hụt)
+  * RETURN_IN: Nhận hàng trả về
+  * RETURN_OUT: Xuất hàng trả về
+
+C. LOT MANAGEMENT (Quản lý lô hàng)
+- Mỗi item có thể có nhiều lot
+- Lot tracking: lot_code, mfg_date, exp_date
+- Hỗ trợ FIFO (First In First Out)
+- Cảnh báo hết hạn
+
+QUY TRÌNH CHI TIẾT:
+
+1. XEM TỒN KHO
+- API: GET /api/inventory/balances
+- Query: location_id, item_id, lot_id, min_qty
+- Output: Danh sách inventory balance
+- Người dùng: Tất cả roles
+
+2. XEM LỊCH SỬ GIAO DỊCH
+- API: GET /api/inventory/transactions
+- Query: location_id, item_id, lot_id, txn_type, start_date, end_date
+- Output: Danh sách transactions
+- Người dùng: Tất cả roles
+
+3. ĐIỀU CHỈNH TỒN KHO (Manager only)
+- API: POST /api/inventory/adjust
+- Input: location_id, item_id, lot_id, qty_adjustment, reason, adjustment_type
+- Output: Updated balance + transaction
+- Người thực hiện: MANAGER
+- Mô tả: Điều chỉnh tồn kho (kiểm kê, hao hụt, hư hỏng)
+
+ADJUSTMENT TYPES:
+- COUNT_ADJUSTMENT: Điều chỉnh kiểm kê
+- DAMAGE: Hàng hỏng
+- EXPIRED: Hàng hết hạn
+- LOST: Hàng mất
+- OTHER: Lý do khác
+
+4. XEM TỔNG HỢP TỒN KHO
+- API: GET /api/inventory/summary
+- Query: location_id, item_type
+- Output: Tổng hợp theo location, category
+- Người dùng: MANAGER, ADMIN
+
+API ENDPOINTS:
+- GET /api/inventory/balances - Số dư tồn kho
+- GET /api/inventory/transactions - Lịch sử giao dịch
+- GET /api/inventory/summary - Tổng hợp tồn kho
+- POST /api/inventory/adjust - Điều chỉnh tồn kho
+- GET /api/inventory/by-location/:locationId - Tồn kho theo vị trí
+- GET /api/inventory/by-item/:itemId - Tồn kho theo sản phẩm
+- GET /api/inventory/expiring - Hàng sắp hết hạn
+
+LOT MANAGEMENT APIs:
+- GET /api/lots - Danh sách lot
+- GET /api/lots/:id - Chi tiết lot
+- POST /api/lots - Tạo lot mới
+- PUT /api/lots/:id - Cập nhật lot
+- GET /api/lots/by-item/:itemId - Lot theo sản phẩm
+- GET /api/lots/expiring - Lot sắp hết hạn
+
+VALIDATION:
+- Chỉ MANAGER có quyền adjust inventory
+- Qty_adjustment có thể âm (giảm) hoặc dương (tăng)
+- Phải có reason khi adjust
+- Không thể adjust làm qty_on_hand < 0
+
+
+11. FLOW 7: ĐIỀU PHỐI CUNG ỨNG (SUPPLY COORDINATION FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Supply Coordinator tổng hợp đơn hàng, lập lịch giao hàng và xử lý sự cố.
+
+THÀNH PHẦN CHÍNH:
+
+A. CONSOLIDATED ORDERS (Tổng hợp đơn hàng)
+- Gom tất cả đơn hàng từ các cửa hàng theo ngày giao
+- Tính tổng nhu cầu cho từng item
+- So sánh với tồn kho hiện có
+- Xác định nhu cầu sản xuất
+
+B. DELIVERY ROUTES (Tuyến giao hàng)
+- Lập tuyến đường giao hàng tối ưu
+- Phân công tài xế và phương tiện
+- Theo dõi tiến độ giao hàng
+- Ghi nhận thời gian thực tế
+
+C. EXCEPTION HANDLING (Xử lý sự cố)
+- Ghi nhận các vấn đề phát sinh
+- Phân loại mức độ nghiêm trọng
+- Theo dõi giải quyết
+- Báo cáo hiệu quả xử lý
+
+D. PERFORMANCE METRICS (Chỉ số hiệu suất)
+- Đo lường hiệu quả giao hàng
+- Tỷ lệ đơn hàng đúng hạn
+- Thời gian xử lý trung bình
+- Tỷ lệ sự cố
+
+QUY TRÌNH CHI TIẾT:
+
+1. TỔNG HỢP ĐƠN HÀNG
+- API: POST /api/consolidated-orders/generate
+- Input: delivery_date, store_ids[] (optional)
+- Output: ConsolidatedOrderSummary
+- Người thực hiện: SUPPLY_COORDINATOR
+- Mô tả: Tự động tổng hợp tất cả đơn hàng APPROVED theo ngày giao
+- Tự động:
+  * Tính tổng qty cho mỗi item
+  * Kiểm tra tồn kho hiện có
+  * Xác định need_to_produce
+  * Phân loại production_status (SUFFICIENT/NEED_PRODUCTION/PARTIAL)
+
+2. LẬP TUYẾN GIAO HÀNG
+- API: POST /api/delivery-routes
+- Input: route_name, driver_name, vehicle_no, planned_date, stops[]
+- Stops: store_org_unit_id, shipment_ids[], estimated_arrival, sequence
+- Output: DeliveryRoute với status = PLANNED
+- Người thực hiện: SUPPLY_COORDINATOR
+- Mô tả: Tạo tuyến giao hàng với các điểm dừng
+
+3. BẮT ĐẦU GIAO HÀNG
+- API: PUT /api/delivery-routes/:id/start
+- Input: { actual_start_time: "2024-01-20T08:00:00Z" }
+- Output: DeliveryRoute status = IN_PROGRESS
+- Người thực hiện: SUPPLY_COORDINATOR hoặc Driver
+- Mô tả: Bắt đầu tuyến giao hàng
+
+4. CẬP NHẬT ĐIỂM DỪNG
+- API: PUT /api/delivery-routes/:id/stops/:stopId
+- Input: { status: "ARRIVED", actual_arrival: "2024-01-20T09:00:00Z" }
+- Output: Updated RouteStop
+- Người thực hiện: SUPPLY_COORDINATOR hoặc Driver
+- Mô tả: Cập nhật trạng thái tại mỗi điểm dừng
+
+5. HOÀN THÀNH TUYẾN
+- API: PUT /api/delivery-routes/:id/complete
+- Input: { actual_end_time: "2024-01-20T12:00:00Z" }
+- Output: DeliveryRoute status = COMPLETED
+- Người thực hiện: SUPPLY_COORDINATOR
+- Mô tả: Hoàn tất tuyến giao hàng
+
+6. GHI NHẬN SỰ CỐ
+- API: POST /api/exceptions
+- Input: exception_type, severity, order_id, description
+- Output: ExceptionLog với status = OPEN
+- Người thực hiện: SUPPLY_COORDINATOR
+- Mô tả: Ghi nhận vấn đề phát sinh
+
+EXCEPTION TYPES:
+- OUT_OF_STOCK: Thiếu hàng
+- LATE_DELIVERY: Giao hàng trễ
+- WRONG_ITEM: Sai sản phẩm
+- QUALITY_ISSUE: Vấn đề chất lượng
+- CANCELLED: Hủy đơn
+- OTHER: Khác
+
+SEVERITY LEVELS:
+- LOW: Thấp
+- MEDIUM: Trung bình
+- HIGH: Cao
+- CRITICAL: Nghiêm trọng
+
+7. GIẢI QUYẾT SỰ CỐ
+- API: PUT /api/exceptions/:id/resolve
+- Input: { resolution: "...", status: "RESOLVED" }
+- Output: ExceptionLog status = RESOLVED
+- Người thực hiện: SUPPLY_COORDINATOR
+- Mô tả: Ghi nhận cách giải quyết
+
+8. XEM HIỆU SUẤT
+- API: GET /api/performance-metrics
+- Query: metric_type, start_date, end_date
+- Output: PerformanceMetrics
+- Người thực hiện: SUPPLY_COORDINATOR, MANAGER
+- Mô tả: Xem các chỉ số hiệu suất
+
+METRIC TYPES:
+- DELIVERY_PERFORMANCE: Hiệu suất giao hàng
+- ORDER_FULFILLMENT: Hoàn thành đơn hàng
+- EXCEPTION_HANDLING: Xử lý sự cố
+- PRODUCTION_EFFICIENCY: Hiệu suất sản xuất
+
+API ENDPOINTS:
+
+Consolidated Orders:
+- GET /api/consolidated-orders - Danh sách tổng hợp
+- POST /api/consolidated-orders/generate - Tạo tổng hợp
+- GET /api/consolidated-orders/:id - Chi tiết tổng hợp
+
+Delivery Routes:
+- GET /api/delivery-routes - Danh sách tuyến
+- GET /api/delivery-routes/:id - Chi tiết tuyến
+- POST /api/delivery-routes - Tạo tuyến mới
+- PUT /api/delivery-routes/:id - Cập nhật tuyến
+- PUT /api/delivery-routes/:id/start - Bắt đầu tuyến
+- PUT /api/delivery-routes/:id/complete - Hoàn thành tuyến
+- PUT /api/delivery-routes/:id/stops/:stopId - Cập nhật điểm dừng
+
+Exceptions:
+- GET /api/exceptions - Danh sách sự cố
+- GET /api/exceptions/:id - Chi tiết sự cố
+- POST /api/exceptions - Ghi nhận sự cố
+- PUT /api/exceptions/:id/resolve - Giải quyết sự cố
+- GET /api/exceptions/by-severity/:severity - Sự cố theo mức độ
+
+Performance Metrics:
+- GET /api/performance-metrics - Danh sách chỉ số
+- GET /api/performance-metrics/delivery-performance - Hiệu suất giao hàng
+- GET /api/performance-metrics/order-fulfillment - Hoàn thành đơn hàng
+- GET /api/performance-metrics/exception-handling - Xử lý sự cố
+- GET /api/performance-metrics/production-efficiency - Hiệu suất sản xuất
+
+VALIDATION:
+- Chỉ SUPPLY_COORDINATOR có quyền tạo delivery route
+- Tuyến phải có ít nhất 1 điểm dừng
+- Sequence của stops phải unique và liên tục
+- Không thể start route nếu chưa có shipment
+- Exception phải có description
+
+
+12. FLOW 8: CẢNH BÁO & THÔNG BÁO (ALERT & NOTIFICATION FLOW)
+--------------------------------------------------------------------------------
+
+MÔ TẢ:
+Hệ thống cảnh báo tự động về hàng hết hạn, tồn kho thấp và các sự kiện quan trọng.
+
+THÀNH PHẦN CHÍNH:
+
+A. EXPIRY ALERTS (Cảnh báo hết hạn)
+- Tự động quét lot sắp hết hạn
+- Phân loại theo mức độ nghiêm trọng
+- Thông báo real-time qua Socket.io
+
+SEVERITY LEVELS:
+- EXPIRED: Đã hết hạn (màu đỏ)
+- CRITICAL: < 3 ngày (màu cam)
+- HIGH: 3-7 ngày (màu vàng)
+- MEDIUM: 7-14 ngày (màu xanh nhạt)
+
+B. LOW STOCK ALERTS (Cảnh báo tồn kho thấp)
+- Theo dõi mức tồn kho tối thiểu
+- Cảnh báo khi qty_available < min_stock_level
+- Đề xuất đặt hàng/sản xuất
+
+C. NOTIFICATIONS (Thông báo)
+- Thông báo về các sự kiện quan trọng
+- Hỗ trợ real-time qua Socket.io
+- Lưu trữ lịch sử thông báo
+
+NOTIFICATION TYPES:
+- ORDER_CREATED: Đơn hàng mới
+- ORDER_APPROVED: Đơn hàng được duyệt
+- ORDER_SHIPPED: Đơn hàng đã giao
+- ORDER_RECEIVED: Đơn hàng đã nhận
+- PRODUCTION_COMPLETED: Sản xuất hoàn thành
+- RETURN_REQUESTED: Yêu cầu trả hàng
+- EXPIRY_WARNING: Cảnh báo hết hạn
+- LOW_STOCK_WARNING: Cảnh báo tồn kho thấp
+- EXCEPTION_REPORTED: Sự cố được báo cáo
+
+QUY TRÌNH CHI TIẾT:
+
+1. XEM CẢNH BÁO HẾT HẠN
+- API: GET /api/alerts/expiry
+- Query: location_id, severity, item_id
+- Output: Danh sách lot sắp hết hạn
+- Người dùng: Tất cả roles
+- Mô tả: Xem danh sách hàng sắp hết hạn theo mức độ
+
+2. XEM CẢNH BÁO TỒN KHO THẤP
+- API: GET /api/alerts/low-stock
+- Query: location_id, item_id
+- Output: Danh sách item có tồn kho thấp
+- Người dùng: Tất cả roles
+- Mô tả: Xem danh sách sản phẩm cần bổ sung
+
+3. XEM TỔNG HỢP CẢNH BÁO
+- API: GET /api/alerts/summary
+- Query: location_id
+- Output: Tổng hợp số lượng cảnh báo theo loại
+- Người dùng: Tất cả roles
+- Mô tả: Dashboard tổng quan về cảnh báo
+
+4. XEM THÔNG BÁO
+- API: GET /api/notifications
+- Query: user_id, is_read, notification_type
+- Output: Danh sách thông báo
+- Người dùng: Tất cả roles
+- Mô tả: Xem thông báo cá nhân
+
+5. ĐÁNH DẤU ĐÃ ĐỌC
+- API: PUT /api/notifications/:id/read
+- Output: Notification với is_read = true
+- Người dùng: Tất cả roles
+- Mô tả: Đánh dấu thông báo đã đọc
+
+6. ĐÁNH DẤU TẤT CẢ ĐÃ ĐỌC
+- API: PUT /api/notifications/read-all
+- Output: Tất cả notification của user → is_read = true
+- Người dùng: Tất cả roles
+- Mô tả: Đánh dấu tất cả thông báo đã đọc
+
+SOCKET.IO EVENTS:
+
+Client → Server:
+- connection: Kết nối với token
+- disconnect: Ngắt kết nối
+
+Server → Client:
+- notification: Thông báo mới
+- alert: Cảnh báo mới
+- order_updated: Đơn hàng cập nhật
+- production_updated: Sản xuất cập nhật
+- shipment_updated: Shipment cập nhật
+
+Kết nối Socket.io:
+```javascript
+const socket = io('http://localhost:5001', {
+  auth: {
+    token: 'Bearer <jwt_token>'
+  }
+});
+
+socket.on('notification', (data) => {
+  console.log('New notification:', data);
+  // Update UI
+});
+
+socket.on('alert', (data) => {
+  console.log('New alert:', data);
+  // Show alert badge
+});
+```
+
+API ENDPOINTS:
+
+Alerts:
+- GET /api/alerts/expiry - Cảnh báo hết hạn
+- GET /api/alerts/low-stock - Cảnh báo tồn kho thấp
+- GET /api/alerts/summary - Tổng hợp cảnh báo
+
+Notifications:
+- GET /api/notifications - Danh sách thông báo
+- GET /api/notifications/:id - Chi tiết thông báo
+- PUT /api/notifications/:id/read - Đánh dấu đã đọc
+- PUT /api/notifications/read-all - Đánh dấu tất cả đã đọc
+- DELETE /api/notifications/:id - Xóa thông báo
+
+FRONTEND IMPLEMENTATION:
+
+1. Alert Badge:
+- Hiển thị số lượng cảnh báo chưa xử lý
+- Màu sắc theo severity
+- Auto-refresh mỗi 5 phút
+
+2. Notification Panel:
+- Dropdown/sidebar hiển thị thông báo
+- Real-time update qua Socket.io
+- Click để đánh dấu đã đọc
+- Link đến chi tiết (order, production, etc.)
+
+3. Alert Dashboard:
+- Biểu đồ tổng hợp cảnh báo
+- Filter theo location, severity
+- Action buttons (tạo order, adjust inventory)
+
+VALIDATION:
+- Expiry alerts tự động tạo mỗi ngày
+- Low stock alerts kiểm tra khi inventory thay đổi
+- Notifications tự động tạo khi có sự kiện
+- Chỉ user liên quan mới nhận notification
+
+
+================================================================================
+PHẦN III: API ENDPOINTS CHI TIẾT
+================================================================================
+
+13. AUTHENTICATION APIs
+--------------------------------------------------------------------------------
+
+BASE: /api/auth
+
+1. POST /auth/register (Admin only)
+   Mô tả: Đăng ký user mới
+   Body: { username, password, full_name, org_unit_id, role_ids[], email, phone }
+   Response: { token, user }
+   Access: ADMIN
+
+2. POST /auth/login
+   Mô tả: Đăng nhập
+   Body: { username, password }
+   Response: { token, user }
+   Access: Public
+
+3. GET /auth/me
+   Mô tả: Lấy thông tin user hiện tại
+   Headers: Authorization: Bearer <token>
+   Response: { user }
+   Access: Authenticated
+
+4. POST /auth/logout
+   Mô tả: Đăng xuất
+   Headers: Authorization: Bearer <token>
+   Response: { message }
+   Access: Authenticated
+
+5. PUT /auth/change-password
+   Mô tả: Đổi mật khẩu
+   Body: { current_password, new_password }
+   Headers: Authorization: Bearer <token>
+   Response: { message }
+   Access: Authenticated
+
+6. PUT /auth/reset-password/:userId (Admin only)
+   Mô tả: Reset mật khẩu user
+   Body: { new_password }
+   Headers: Authorization: Bearer <token>
+   Response: { message }
+   Access: ADMIN
+
+7. POST /auth/send-password-setup/:userId (Admin only)
+   Mô tả: Gửi email setup password
+   Headers: Authorization: Bearer <token>
+   Response: { email, message_id }
+   Access: ADMIN
+
+8. POST /auth/set-password
+   Mô tả: Set password qua token từ email
+   Body: { token, new_password }
+   Response: { token, user }
+   Access: Public
+
+14. MASTER DATA APIs
+--------------------------------------------------------------------------------
+
+BASE: /api/master-data
+
+CATEGORIES:
+1. GET /master-data/categories
+   Mô tả: Danh sách danh mục
+   Query: parent_id
+   Response: [{ _id, name, parent_id }]
+   Access: All
+
+2. POST /master-data/categories
+   Mô tả: Tạo danh mục
+   Body: { name, parent_id }
+   Response: { category }
+   Access: MANAGER, ADMIN
+
+3. PUT /master-data/categories/:id
+   Mô tả: Cập nhật danh mục
+   Body: { name, parent_id }
+   Response: { category }
+   Access: MANAGER, ADMIN
+
+4. DELETE /master-data/categories/:id
+   Mô tả: Xóa danh mục
+   Response: { message }
+   Access: ADMIN
+
+SUPPLIERS:
+5. GET /master-data/suppliers
+   Mô tả: Danh sách nhà cung cấp
+   Query: status
+   Response: [{ _id, name, tax_code, address, phone, email }]
+   Access: All
+
+6. POST /master-data/suppliers
+   Mô tả: Tạo nhà cung cấp
+   Body: { name, tax_code, address, phone, email }
+   Response: { supplier }
+   Access: MANAGER, ADMIN
+
+7. PUT /master-data/suppliers/:id
+   Mô tả: Cập nhật nhà cung cấp
+   Body: { name, tax_code, address, phone, email }
+   Response: { supplier }
+   Access: MANAGER, ADMIN
+
+ORG UNITS:
+8. GET /master-data/org-units
+   Mô tả: Danh sách đơn vị tổ chức
+   Query: type (KITCHEN/STORE), status
+   Response: [{ _id, type, code, name, address, district, city, status }]
+   Access: All
+
+9. POST /master-data/org-units
+   Mô tả: Tạo đơn vị tổ chức
+   Body: { type, code, name, address, district, city }
+   Response: { org_unit }
+   Access: ADMIN
+
+10. PUT /master-data/org-units/:id
+    Mô tả: Cập nhật đơn vị tổ chức
+    Body: { name, address, district, city, status }
+    Response: { org_unit }
+    Access: ADMIN
+
+LOCATIONS:
+11. GET /master-data/locations
+    Mô tả: Danh sách vị trí kho
+    Query: org_unit_id, status
+    Response: [{ _id, org_unit_id, code, name, status }]
+    Access: All
+
+12. POST /master-data/locations
+    Mô tả: Tạo vị trí kho
+    Body: { org_unit_id, code, name }
+    Response: { location }
+    Access: MANAGER, ADMIN
+
+13. PUT /master-data/locations/:id
+    Mô tả: Cập nhật vị trí kho
+    Body: { name, status }
+    Response: { location }
+    Access: MANAGER, ADMIN
+
+ROLES:
+14. GET /master-data/roles
+    Mô tả: Danh sách vai trò
+    Response: [{ _id, code, name }]
+    Access: All
+
+UOMs:
+15. GET /master-data/uoms
+    Mô tả: Danh sách đơn vị tính
+    Response: [{ _id, code, name }]
+    Access: All
+
+16. POST /master-data/uoms
+    Mô tả: Tạo đơn vị tính
+    Body: { code, name }
+    Response: { uom }
+    Access: ADMIN
+
+
+15. ORDER MANAGEMENT APIs
+--------------------------------------------------------------------------------
+
+BASE: /api/internal-orders
+
+1. GET /internal-orders
+   Mô tả: Danh sách đơn hàng
+   Query: page, limit, status, store_org_unit_id, start_date, end_date
+   Response: { data: [], pagination: {} }
+   Access: All
+
+2. GET /internal-orders/:id
+   Mô tả: Chi tiết đơn hàng
+   Response: { order với lines[] }
+   Access: All
+
+3. POST /internal-orders
+   Mô tả: Tạo đơn hàng
+   Body: { store_org_unit_id, order_date, lines[] }
+   Lines: { item_id, qty_ordered, uom_id, unit_price }
+   Response: { order }
+   Access: STORE_STAFF, MANAGER, ADMIN
+
+4. PUT /internal-orders/:id
+   Mô tả: Cập nhật đơn hàng (chỉ khi DRAFT)
+   Body: { order_date, lines[] }
+   Response: { order }
+   Access: STORE_STAFF (own store), MANAGER, ADMIN
+
+5. PUT /internal-orders/:id/status
+   Mô tả: Cập nhật trạng thái
+   Body: { status }
+   Valid transitions:
+   - DRAFT → SUBMITTED (STORE_STAFF)
+   - SUBMITTED → APPROVED (CHEF, MANAGER)
+   - APPROVED → PROCESSING (CHEF)
+   - PROCESSING → SHIPPED (auto when create shipment)
+   - SHIPPED → RECEIVED (auto when confirm goods receipt)
+   - Any → CANCELLED (MANAGER, ADMIN)
+   Response: { order }
+   Access: Depends on transition
+
+6. POST /internal-orders/:id/lines
+   Mô tả: Thêm dòng đơn hàng (chỉ khi DRAFT)
+   Body: { item_id, qty_ordered, uom_id, unit_price }
+   Response: { order }
+   Access: STORE_STAFF (own store), MANAGER, ADMIN
+
+7. DELETE /internal-orders/:id/lines/:lineId
+   Mô tả: Xóa dòng đơn hàng (chỉ khi DRAFT)
+   Response: { order }
+   Access: STORE_STAFF (own store), MANAGER, ADMIN
+
+8. GET /internal-orders/by-store/:storeId
+   Mô tả: Đơn hàng theo cửa hàng
+   Query: status, start_date, end_date
+   Response: { data: [] }
+   Access: STORE_STAFF (own store), MANAGER, ADMIN
+
+16. PRODUCTION APIs
+--------------------------------------------------------------------------------
+
+BASE: /api/production-orders
+
+1. GET /production-orders
+   Mô tả: Danh sách lệnh sản xuất
+   Query: page, limit, status, start_date, end_date
+   Response: { data: [], pagination: {} }
+   Access: CHEF, MANAGER, ADMIN
+
+2. GET /production-orders/:id
+   Mô tả: Chi tiết lệnh sản xuất
+   Response: { production_order với lines[], consumption[], output[] }
+   Access: CHEF, MANAGER, ADMIN
+
+3. POST /production-orders
+   Mô tả: Tạo lệnh sản xuất
+   Body: { planned_start, planned_end, lines[] }
+   Lines: { item_id, recipe_id, planned_qty, uom_id }
+   Response: { production_order }
+   Access: CHEF, MANAGER
+
+4. PUT /production-orders/:id
+   Mô tả: Cập nhật lệnh sản xuất (chỉ khi PLANNED)
+   Body: { planned_start, planned_end, lines[] }
+   Response: { production_order }
+   Access: CHEF, MANAGER
+
+5. PUT /production-orders/:id/status
+   Mô tả: Cập nhật trạng thái
+   Body: { status, actual_start, actual_end }
+   Valid transitions:
+   - PLANNED → IN_PROGRESS (with actual_start)
+   - IN_PROGRESS → DONE (with actual_end)
+   - Any → CANCELLED
+   Response: { production_order }
+   Access: CHEF, MANAGER
+
+6. POST /production-orders/:id/consumption
+   Mô tả: Ghi nhận tiêu hao nguyên liệu
+   Body: { prod_order_line_id, material_item_id, lot_id, qty, uom_id }
+   Response: { consumption }
+   Auto: Trừ inventory, tạo transaction
+   Access: CHEF
+
+7. POST /production-orders/:id/output
+   Mô tả: Ghi nhận sản phẩm đầu ra
+   Body: { prod_order_line_id, lot_id, qty, uom_id }
+   Response: { output }
+   Auto: Cộng inventory, tạo transaction
+   Access: CHEF
+
+8. GET /production-orders/:id/consumption
+   Mô tả: Xem tiêu hao
+   Response: { consumption[] }
+   Access: CHEF, MANAGER, ADMIN
+
+9. GET /production-orders/:id/output
+   Mô tả: Xem sản phẩm đầu ra
+   Response: { output[] }
+   Access: CHEF, MANAGER, ADMIN
+
+RECIPE APIs:
+BASE: /api/recipes
+
+10. GET /recipes
+    Mô tả: Danh sách công thức
+    Query: item_id, status
+    Response: { data: [] }
+    Access: All
+
+11. GET /recipes/:id
+    Mô tả: Chi tiết công thức
+    Response: { recipe với lines[] }
+    Access: All
+
+12. POST /recipes
+    Mô tả: Tạo công thức
+    Body: { item_id, version, status, effective_from, effective_to }
+    Response: { recipe }
+    Access: MANAGER, ADMIN
+
+13. PUT /recipes/:id
+    Mô tả: Cập nhật công thức
+    Body: { version, status, effective_from, effective_to }
+    Response: { recipe }
+    Access: MANAGER, ADMIN
+
+14. POST /recipes/:id/lines
+    Mô tả: Thêm nguyên liệu vào công thức
+    Body: { material_item_id, qty_per_batch, uom_id, scrap_rate }
+    Response: { recipe }
+    Access: MANAGER, ADMIN
+
+15. DELETE /recipes/:id/lines/:lineId
+    Mô tả: Xóa nguyên liệu khỏi công thức
+    Response: { recipe }
+    Access: MANAGER, ADMIN
+
+17. LOGISTICS APIs
+--------------------------------------------------------------------------------
+
+SHIPMENT APIs:
+BASE: /api/shipments
+
+1. GET /shipments
+   Mô tả: Danh sách lô hàng
+   Query: page, limit, status, order_id, from_location_id, to_location_id
+   Response: { data: [], pagination: {} }
+   Access: All
+
+2. GET /shipments/:id
+   Mô tả: Chi tiết lô hàng
+   Response: { shipment với lines[] và lots[] }
+   Access: All
+
+3. POST /shipments
+   Mô tả: Tạo lô hàng
+   Body: { order_id, from_location_id, to_location_id, ship_date, lines[] }
+   Lines: { order_line_id, item_id, qty, uom_id, lots[] }
+   Lots: { lot_id, qty }
+   Response: { shipment }
+   Auto: Order status → SHIPPED, trừ inventory, tạo transaction
+   Access: CHEF
+
+4. PUT /shipments/:id
+   Mô tả: Cập nhật lô hàng (chỉ khi PENDING)
+   Body: { ship_date, lines[] }
+   Response: { shipment }
+   Access: CHEF
+
+5. PUT /shipments/:id/status
+   Mô tả: Cập nhật trạng thái
+   Body: { status }
+   Valid transitions:
+   - PENDING → SHIPPED
+   - SHIPPED → DELIVERED
+   - Any → CANCELLED
+   Response: { shipment }
+   Access: CHEF, SUPPLY_COORDINATOR
+
+6. GET /shipments/by-order/:orderId
+   Mô tả: Lô hàng theo đơn hàng
+   Response: { data: [] }
+   Access: All
+
+GOODS RECEIPT APIs:
+BASE: /api/goods-receipts
+
+7. GET /goods-receipts
+   Mô tả: Danh sách phiếu nhận hàng
+   Query: page, limit, status, shipment_id, start_date, end_date
+   Response: { data: [], pagination: {} }
+   Access: All
+
+8. GET /goods-receipts/:id
+   Mô tả: Chi tiết phiếu nhận hàng
+   Response: { goods_receipt với lines[] }
+   Access: All
+
+9. POST /goods-receipts
+   Mô tả: Tạo phiếu nhận hàng
+   Body: { shipment_id, received_date, lines[] }
+   Lines: { shipment_line_id, item_id, qty_received, qty_rejected }
+   Response: { goods_receipt }
+   Access: STORE_STAFF
+
+10. PUT /goods-receipts/:id/confirm
+    Mô tả: Xác nhận nhận hàng
+    Body: { status: "RECEIVED" }
+    Response: { goods_receipt }
+    Auto: Cộng inventory, tạo transaction, update order fulfillment
+    Access: STORE_STAFF
+
+11. GET /goods-receipts/by-shipment/:shipmentId
+    Mô tả: Phiếu nhận theo shipment
+    Response: { data: [] }
+    Access: All
+
+
+18. INVENTORY APIs
+--------------------------------------------------------------------------------
+
+BASE: /api/inventory
+
+1. GET /inventory/balances
+   Mô tả: Số dư tồn kho
+   Query: location_id, item_id, lot_id, min_qty
+   Response: [{ location_id, item_id, lot_id, qty_on_hand, qty_reserved, qty_available }]
+   Access: All
+
+2. GET /inventory/transactions
+   Mô tả: Lịch sử giao dịch
+   Query: page, limit, location_id, item_id, lot_id, txn_type, start_date, end_date
+   Response: { data: [], pagination: {} }
+   Access: All
+
+3. GET /inventory/summary
+   Mô tả: Tổng hợp tồn kho
+   Query: location_id, item_type
+   Response: { by_location[], by_category[], total_value }
+   Access: MANAGER, ADMIN
+
+4. POST /inventory/adjust
+   Mô tả: Điều chỉnh tồn kho
+   Body: { location_id, item_id, lot_id, qty_adjustment, uom_id, reason, adjustment_type }
+   Response: { balance, transaction }
+   Access: MANAGER, ADMIN
+
+5. GET /inventory/by-location/:locationId
+   Mô tả: Tồn kho theo vị trí
+   Query: item_id, min_qty
+   Response: { data: [] }
+   Access: All
+
+6. GET /inventory/by-item/:itemId
+   Mô tả: Tồn kho theo sản phẩm
+   Query: location_id
+   Response: { data: [] }
+   Access: All
+
+7. GET /inventory/expiring
+   Mô tả: Hàng sắp hết hạn
+   Query: location_id, days (default: 7)
+   Response: { data: [] }
+   Access: All
+
+LOT APIs:
+BASE: /api/lots
+
+8. GET /lots
+   Mô tả: Danh sách lot
+   Query: item_id, location_id, status
+   Response: { data: [] }
+   Access: All
+
+9. GET /lots/:id
+   Mô tả: Chi tiết lot
+   Response: { lot }
+   Access: All
+
+10. POST /lots
+    Mô tả: Tạo lot
+    Body: { item_id, lot_code, mfg_date, exp_date }
+    Response: { lot }
+    Access: CHEF, MANAGER
+
+11. PUT /lots/:id
+    Mô tả: Cập nhật lot
+    Body: { mfg_date, exp_date }
+    Response: { lot }
+    Access: CHEF, MANAGER
+
+12. GET /lots/by-item/:itemId
+    Mô tả: Lot theo sản phẩm
+    Query: status
+    Response: { data: [] }
+    Access: All
+
+13. GET /lots/expiring
+    Mô tả: Lot sắp hết hạn
+    Query: days (default: 7)
+    Response: { data: [] }
+    Access: All
+
+ITEM APIs:
+BASE: /api/items
+
+14. GET /items
+    Mô tả: Danh sách sản phẩm
+    Query: page, limit, item_type, category_id, status, search
+    Response: { data: [], pagination: {} }
+    Access: All
+
+15. GET /items/:id
+    Mô tả: Chi tiết sản phẩm
+    Response: { item }
+    Access: All
+
+16. POST /items
+    Mô tả: Tạo sản phẩm
+    Body: { sku, name, item_type, base_uom_id, category_id, tracking_type, 
+            shelf_life_days, cost_price, base_sell_price }
+    Response: { item }
+    Access: MANAGER, ADMIN
+
+17. PUT /items/:id
+    Mô tả: Cập nhật sản phẩm
+    Body: { name, cost_price, base_sell_price, status }
+    Response: { item }
+    Access: MANAGER, ADMIN
+
+18. DELETE /items/:id
+    Mô tả: Xóa sản phẩm (soft delete)
+    Response: { message }
+    Access: ADMIN
+
+19. DASHBOARD & ANALYTICS APIs
+--------------------------------------------------------------------------------
+
+BASE: /api/dashboard
+
+1. GET /dashboard/overview
+   Mô tả: Tổng quan hệ thống
+   Query: start_date, end_date, org_unit_id
+   Response: {
+     orders: { total, pending, completed, completion_rate },
+     production: { total, active },
+     shipments: { total, in_transit },
+     inventory: { total_value, total_items }
+   }
+   Access: MANAGER, ADMIN
+
+2. GET /dashboard/orders
+   Mô tả: Thống kê đơn hàng
+   Query: start_date, end_date, group_by (day/week/month)
+   Response: {
+     by_status: [],
+     trend: [],
+     top_stores: []
+   }
+   Access: MANAGER, ADMIN
+
+3. GET /dashboard/production
+   Mô tả: Thống kê sản xuất
+   Query: start_date, end_date
+   Response: {
+     by_status: [],
+     efficiency: { total_planned, total_actual, efficiency_rate },
+     trend: []
+   }
+   Access: MANAGER, ADMIN
+
+4. GET /dashboard/inventory
+   Mô tả: Thống kê tồn kho
+   Query: org_unit_id
+   Response: {
+     by_location: [],
+     by_type: [],
+     recent_transactions: [],
+     transactions_by_type: []
+   }
+   Access: MANAGER, ADMIN
+
+5. GET /dashboard/shipments
+   Mô tả: Thống kê giao hàng
+   Query: start_date, end_date
+   Response: {
+     by_status: [],
+     on_time_rate: number,
+     trend: []
+   }
+   Access: MANAGER, ADMIN
+
+ALERT APIs:
+BASE: /api/alerts
+
+6. GET /alerts/expiry
+   Mô tả: Cảnh báo hết hạn
+   Query: location_id, severity, item_id
+   Response: [{ lot, item, location, days_until_expiry, severity }]
+   Access: All
+
+7. GET /alerts/low-stock
+   Mô tả: Cảnh báo tồn kho thấp
+   Query: location_id, item_id
+   Response: [{ item, location, qty_available, min_stock_level }]
+   Access: All
+
+8. GET /alerts/summary
+   Mô tả: Tổng hợp cảnh báo
+   Query: location_id
+   Response: {
+     expiry: { expired, critical, high, medium },
+     low_stock: { count }
+   }
+   Access: All
+
+RETURN REQUEST APIs:
+BASE: /api/return-requests
+
+9. GET /return-requests
+   Mô tả: Danh sách yêu cầu trả hàng
+   Query: page, limit, status, store_org_unit_id, start_date, end_date
+   Response: { data: [], pagination: {} }
+   Access: All
+
+10. GET /return-requests/:id
+    Mô tả: Chi tiết yêu cầu trả hàng
+    Response: { return_request với lines[] }
+    Access: All
+
+11. POST /return-requests
+    Mô tả: Tạo yêu cầu trả hàng
+    Body: { store_org_unit_id, source_receipt_id, request_date, lines[] }
+    Lines: { source_receipt_line_id, item_id, lot_id, qty_requested, 
+             defect_type, disposition, notes }
+    Response: { return_request }
+    Access: STORE_STAFF
+
+12. PUT /return-requests/:id/status
+    Mô tả: Cập nhật trạng thái
+    Body: { status, rejection_reason }
+    Valid transitions:
+    - REQUESTED → APPROVED (CHEF, MANAGER)
+    - REQUESTED → REJECTED (CHEF, MANAGER)
+    - APPROVED → PROCESSING
+    - PROCESSING → COMPLETED
+    Response: { return_request }
+    Access: CHEF, MANAGER
+
+13. PUT /return-requests/:id/process
+    Mô tả: Xử lý trả hàng
+    Body: { process_date }
+    Response: { return_request }
+    Auto: Trừ inventory cửa hàng, cộng inventory bếp (nếu RESTOCK)
+    Access: CHEF
+
+14. GET /return-requests/by-store/:storeId
+    Mô tả: Yêu cầu trả hàng theo cửa hàng
+    Query: status
+    Response: { data: [] }
+    Access: STORE_STAFF (own store), MANAGER, ADMIN
+
+
+SUPPLY COORDINATION APIs:
+BASE: /api/consolidated-orders, /api/delivery-routes, /api/exceptions, /api/performance-metrics
+
+CONSOLIDATED ORDERS:
+15. GET /consolidated-orders
+    Mô tả: Danh sách tổng hợp đơn hàng
+    Query: delivery_date, start_date, end_date
+    Response: { data: [] }
+    Access: SUPPLY_COORDINATOR, MANAGER, ADMIN
+
+16. POST /consolidated-orders/generate
+    Mô tả: Tạo tổng hợp đơn hàng
+    Body: { delivery_date, store_ids[] }
+    Response: { consolidated_orders[] }
+    Auto: Tổng hợp tất cả đơn APPROVED, kiểm tra tồn kho
+    Access: SUPPLY_COORDINATOR, MANAGER
+
+17. GET /consolidated-orders/:id
+    Mô tả: Chi tiết tổng hợp
+    Response: { consolidated_order }
+    Access: SUPPLY_COORDINATOR, MANAGER, ADMIN
+
+DELIVERY ROUTES:
+18. GET /delivery-routes
+    Mô tả: Danh sách tuyến giao hàng
+    Query: page, limit, status, planned_date
+    Response: { data: [], pagination: {} }
+    Access: SUPPLY_COORDINATOR, CHEF, MANAGER
+
+19. GET /delivery-routes/:id
+    Mô tả: Chi tiết tuyến
+    Response: { delivery_route với stops[] }
+    Access: SUPPLY_COORDINATOR, CHEF, MANAGER
+
+20. POST /delivery-routes
+    Mô tả: Tạo tuyến giao hàng
+    Body: { route_name, driver_name, driver_phone, vehicle_no, vehicle_type,
+            planned_date, stops[] }
+    Stops: { sequence, store_org_unit_id, shipment_ids[], estimated_arrival,
+             estimated_departure, notes }
+    Response: { delivery_route }
+    Access: SUPPLY_COORDINATOR
+
+21. PUT /delivery-routes/:id
+    Mô tả: Cập nhật tuyến (chỉ khi PLANNED)
+    Body: { route_name, driver_name, vehicle_no, stops[] }
+    Response: { delivery_route }
+    Access: SUPPLY_COORDINATOR
+
+22. PUT /delivery-routes/:id/start
+    Mô tả: Bắt đầu tuyến
+    Body: { actual_start_time }
+    Response: { delivery_route }
+    Access: SUPPLY_COORDINATOR
+
+23. PUT /delivery-routes/:id/complete
+    Mô tả: Hoàn thành tuyến
+    Body: { actual_end_time }
+    Response: { delivery_route }
+    Access: SUPPLY_COORDINATOR
+
+24. PUT /delivery-routes/:id/stops/:stopId
+    Mô tả: Cập nhật điểm dừng
+    Body: { status, actual_arrival, actual_departure, notes }
+    Response: { delivery_route }
+    Access: SUPPLY_COORDINATOR
+
+EXCEPTIONS:
+25. GET /exceptions
+    Mô tả: Danh sách sự cố
+    Query: page, limit, status, exception_type, severity, start_date, end_date
+    Response: { data: [], pagination: {} }
+    Access: All
+
+26. GET /exceptions/:id
+    Mô tả: Chi tiết sự cố
+    Response: { exception }
+    Access: All
+
+27. POST /exceptions
+    Mô tả: Ghi nhận sự cố
+    Body: { exception_type, severity, order_id, item_id, store_org_unit_id,
+            description }
+    Response: { exception }
+    Access: SUPPLY_COORDINATOR, CHEF, MANAGER
+
+28. PUT /exceptions/:id/resolve
+    Mô tả: Giải quyết sự cố
+    Body: { resolution, status: "RESOLVED" }
+    Response: { exception }
+    Access: SUPPLY_COORDINATOR, MANAGER
+
+29. GET /exceptions/by-severity/:severity
+    Mô tả: Sự cố theo mức độ
+    Response: { data: [] }
+    Access: All
+
+PERFORMANCE METRICS:
+30. GET /performance-metrics
+    Mô tả: Danh sách chỉ số
+    Query: metric_type, start_date, end_date
+    Response: { data: [] }
+    Access: SUPPLY_COORDINATOR, MANAGER, ADMIN
+
+31. GET /performance-metrics/delivery-performance
+    Mô tả: Hiệu suất giao hàng
+    Query: start_date, end_date
+    Response: { total_deliveries, on_time_deliveries, on_time_rate, 
+                average_delay_mins }
+    Access: SUPPLY_COORDINATOR, MANAGER, ADMIN
+
+32. GET /performance-metrics/order-fulfillment
+    Mô tả: Hoàn thành đơn hàng
+    Query: start_date, end_date
+    Response: { total_orders, fully_fulfilled, fulfillment_rate,
+                average_fulfillment_time_hours }
+    Access: SUPPLY_COORDINATOR, MANAGER, ADMIN
+
+33. GET /performance-metrics/exception-handling
+    Mô tả: Xử lý sự cố
+    Query: start_date, end_date
+    Response: { total_exceptions, resolved_exceptions, 
+                average_resolution_time_hours, critical_exceptions }
+    Access: SUPPLY_COORDINATOR, MANAGER, ADMIN
+
+34. GET /performance-metrics/production-efficiency
+    Mô tả: Hiệu suất sản xuất
+    Query: start_date, end_date
+    Response: { total_production_orders, total_planned_qty, total_actual_qty,
+                efficiency_rate, average_production_time_hours }
+    Access: MANAGER, ADMIN
+
+NOTIFICATION APIs:
+BASE: /api/notifications
+
+35. GET /notifications
+    Mô tả: Danh sách thông báo
+    Query: page, limit, is_read, notification_type
+    Response: { data: [], pagination: {} }
+    Access: Authenticated (own notifications)
+
+36. GET /notifications/:id
+    Mô tả: Chi tiết thông báo
+    Response: { notification }
+    Access: Authenticated (own notification)
+
+37. PUT /notifications/:id/read
+    Mô tả: Đánh dấu đã đọc
+    Response: { notification }
+    Access: Authenticated (own notification)
+
+38. PUT /notifications/read-all
+    Mô tả: Đánh dấu tất cả đã đọc
+    Response: { message, count }
+    Access: Authenticated
+
+39. DELETE /notifications/:id
+    Mô tả: Xóa thông báo
+    Response: { message }
+    Access: Authenticated (own notification)
+
+USER MANAGEMENT APIs:
+BASE: /api/users
+
+40. GET /users
+    Mô tả: Danh sách người dùng
+    Query: page, limit, org_unit_id, status
+    Response: { data: [], pagination: {} }
+    Access: ADMIN
+
+41. GET /users/:id
+    Mô tả: Chi tiết người dùng
+    Response: { user với roles[] }
+    Access: ADMIN
+
+42. PUT /users/:id
+    Mô tả: Cập nhật người dùng
+    Body: { full_name, email, phone, status }
+    Response: { user }
+    Access: ADMIN
+
+43. DELETE /users/:id
+    Mô tả: Xóa người dùng (soft delete)
+    Response: { message }
+    Access: ADMIN
+
+44. POST /users/:id/roles
+    Mô tả: Gán roles cho user
+    Body: { role_ids[] }
+    Response: { user với roles[] }
+    Access: ADMIN
+
+45. DELETE /users/:id/roles
+    Mô tả: Xóa roles khỏi user
+    Body: { role_ids[] }
+    Response: { user với roles[] }
+    Access: ADMIN
+
+
+================================================================================
+PHẦN IV: HƯỚNG DẪN SỬ DỤNG THEO VAI TRÒ
+================================================================================
+
+20. FRANCHISE STORE STAFF (Nhân viên cửa hàng)
+--------------------------------------------------------------------------------
+
+NHIỆM VỤ CHÍNH:
+1. Tạo và quản lý đơn đặt hàng
+2. Nhận hàng và kiểm tra chất lượng
+3. Quản lý tồn kho cửa hàng
+4. Xử lý hàng trả lại
+
+WORKFLOW HÀNG NGÀY:
+
+SÁNG:
+1. Kiểm tra tồn kho
+   - GET /api/inventory/balances?location_id={store_location}
+   - Xem cảnh báo hết hạn: GET /api/alerts/expiry?location_id={store_location}
+   - Xem cảnh báo tồn kho thấp: GET /api/alerts/low-stock?location_id={store_location}
+
+2. Tạo đơn đặt hàng (nếu cần)
+   - POST /api/internal-orders
+   - Thêm các item cần đặt
+   - Kiểm tra và gửi đơn: PUT /api/internal-orders/:id/status { status: "SUBMITTED" }
+
+3. Theo dõi đơn hàng đang xử lý
+   - GET /api/internal-orders?store_org_unit_id={store_id}&status=PROCESSING
+
+CHIỀU:
+4. Nhận hàng giao đến
+   - Xem shipment: GET /api/shipments?to_location_id={store_location}&status=SHIPPED
+   - Tạo phiếu nhận: POST /api/goods-receipts
+   - Kiểm tra chất lượng, ghi nhận qty_received và qty_rejected
+   - Xác nhận: PUT /api/goods-receipts/:id/confirm
+
+5. Xử lý hàng lỗi (nếu có)
+   - Tạo yêu cầu trả hàng: POST /api/return-requests
+   - Chọn defect_type và disposition
+   - Theo dõi xử lý: GET /api/return-requests/:id
+
+TỐI:
+6. Kiểm tra thông báo
+   - GET /api/notifications?is_read=false
+   - Đánh dấu đã đọc: PUT /api/notifications/:id/read
+
+7. Xem báo cáo tồn kho cuối ngày
+   - GET /api/inventory/balances?location_id={store_location}
+
+CÁC API THƯỜNG DÙNG:
+- POST /api/internal-orders - Tạo đơn hàng
+- GET /api/internal-orders - Xem đơn hàng
+- POST /api/goods-receipts - Nhận hàng
+- POST /api/return-requests - Trả hàng
+- GET /api/inventory/balances - Xem tồn kho
+- GET /api/alerts/expiry - Cảnh báo hết hạn
+- GET /api/notifications - Xem thông báo
+
+LƯU Ý:
+- Chỉ có thể tạo đơn hàng cho cửa hàng của mình
+- Phải kiểm tra kỹ hàng trước khi confirm goods receipt
+- Ghi rõ lý do khi tạo return request
+- Theo dõi cảnh báo hết hạn hàng ngày
+
+21. CENTRAL KITCHEN STAFF (Nhân viên bếp trung tâm)
+--------------------------------------------------------------------------------
+
+NHIỆM VỤ CHÍNH:
+1. Xử lý đơn đặt hàng từ cửa hàng
+2. Lập kế hoạch và thực hiện sản xuất
+3. Quản lý nguyên liệu và thành phẩm
+4. Tạo shipment và giao hàng
+
+WORKFLOW HÀNG NGÀY:
+
+SÁNG:
+1. Xem đơn hàng mới
+   - GET /api/internal-orders?status=SUBMITTED
+   - Phê duyệt: PUT /api/internal-orders/:id/status { status: "APPROVED" }
+
+2. Kiểm tra tồn kho nguyên liệu
+   - GET /api/inventory/balances?location_id={kitchen_raw_location}
+   - Xem cảnh báo: GET /api/alerts/expiry?location_id={kitchen_raw_location}
+
+3. Lập kế hoạch sản xuất
+   - Xem nhu cầu từ đơn hàng
+   - Tạo production order: POST /api/production-orders
+   - Chọn recipe và số lượng
+
+TRƯA:
+4. Thực hiện sản xuất
+   - Bắt đầu: PUT /api/production-orders/:id/status { status: "IN_PROGRESS" }
+   - Ghi nhận tiêu hao: POST /api/production-orders/:id/consumption
+   - Scan lot nguyên liệu
+   - Ghi nhận sản phẩm: POST /api/production-orders/:id/output
+   - Tạo lot mới cho thành phẩm: POST /api/lots
+   - Hoàn thành: PUT /api/production-orders/:id/status { status: "DONE" }
+
+CHIỀU:
+5. Chuẩn bị giao hàng
+   - Xem đơn hàng cần giao: GET /api/internal-orders?status=APPROVED
+   - Tạo shipment: POST /api/shipments
+   - Chọn lot cho từng item (FIFO)
+   - Xác nhận giao: PUT /api/shipments/:id/status { status: "SHIPPED" }
+
+6. Xử lý hàng trả về
+   - Xem return request: GET /api/return-requests?status=REQUESTED
+   - Phê duyệt: PUT /api/return-requests/:id/status { status: "APPROVED" }
+   - Xử lý: PUT /api/return-requests/:id/process
+   - Hoàn thành: PUT /api/return-requests/:id/status { status: "COMPLETED" }
+
+TỐI:
+7. Kiểm tra tồn kho thành phẩm
+   - GET /api/inventory/balances?location_id={kitchen_fg_location}
+
+8. Xem báo cáo sản xuất
+   - GET /api/production-orders?status=DONE&start_date={today}
+
+CÁC API THƯỜNG DÙNG:
+- GET /api/internal-orders - Xem đơn hàng
+- PUT /api/internal-orders/:id/status - Phê duyệt đơn
+- POST /api/production-orders - Tạo lệnh sản xuất
+- POST /api/production-orders/:id/consumption - Ghi tiêu hao
+- POST /api/production-orders/:id/output - Ghi sản phẩm
+- POST /api/shipments - Tạo shipment
+- POST /api/lots - Tạo lot
+- GET /api/recipes - Xem công thức
+- GET /api/inventory/balances - Xem tồn kho
+
+LƯU Ý:
+- Luôn chọn lot theo FIFO (First In First Out)
+- Kiểm tra hạn sử dụng trước khi xuất kho
+- Ghi nhận chính xác tiêu hao và sản phẩm
+- Tạo lot code theo format chuẩn: L-{ITEM}-{DATE}-{SEQ}
+
+
+22. SUPPLY COORDINATOR (Điều phối cung ứng)
+--------------------------------------------------------------------------------
+
+NHIỆM VỤ CHÍNH:
+1. Tổng hợp đơn hàng từ các cửa hàng
+2. Lập lịch và tuyến giao hàng
+3. Theo dõi tiến độ giao hàng
+4. Xử lý sự cố và ngoại lệ
+
+WORKFLOW HÀNG NGÀY:
+
+SÁNG:
+1. Tổng hợp đơn hàng
+   - POST /api/consolidated-orders/generate { delivery_date: "tomorrow" }
+   - Xem nhu cầu tổng hợp: GET /api/consolidated-orders?delivery_date={tomorrow}
+   - Kiểm tra production_status (SUFFICIENT/NEED_PRODUCTION)
+   - Nếu NEED_PRODUCTION: Thông báo cho Kitchen Staff
+
+2. Lập tuyến giao hàng
+   - Xem shipment cần giao: GET /api/shipments?status=PENDING
+   - Tạo tuyến: POST /api/delivery-routes
+   - Phân công tài xế và phương tiện
+   - Sắp xếp thứ tự điểm dừng tối ưu
+
+3. Kiểm tra sự cố
+   - GET /api/exceptions?status=OPEN
+   - Ưu tiên xử lý CRITICAL và HIGH severity
+
+TRƯA:
+4. Theo dõi giao hàng
+   - Xem tuyến đang chạy: GET /api/delivery-routes?status=IN_PROGRESS
+   - Cập nhật điểm dừng: PUT /api/delivery-routes/:id/stops/:stopId
+   - Ghi nhận actual_arrival và actual_departure
+
+5. Xử lý sự cố phát sinh
+   - Ghi nhận: POST /api/exceptions
+   - Phân loại exception_type và severity
+   - Liên hệ các bên liên quan
+   - Đề xuất giải pháp
+
+CHIỀU:
+6. Hoàn thành tuyến giao hàng
+   - PUT /api/delivery-routes/:id/complete
+   - Kiểm tra tất cả điểm dừng đã COMPLETED
+   - Ghi nhận actual_end_time
+
+7. Giải quyết sự cố
+   - PUT /api/exceptions/:id/resolve
+   - Ghi nhận resolution
+   - Cập nhật status = RESOLVED
+
+TỐI:
+8. Xem báo cáo hiệu suất
+   - GET /api/performance-metrics/delivery-performance
+   - GET /api/performance-metrics/order-fulfillment
+   - GET /api/performance-metrics/exception-handling
+
+9. Lập kế hoạch ngày mai
+   - Xem đơn hàng APPROVED cho ngày mai
+   - Dự kiến số tuyến cần thiết
+   - Phân công tài xế
+
+CÁC API THƯỜNG DÙNG:
+- POST /api/consolidated-orders/generate - Tổng hợp đơn hàng
+- POST /api/delivery-routes - Tạo tuyến giao hàng
+- PUT /api/delivery-routes/:id/start - Bắt đầu tuyến
+- PUT /api/delivery-routes/:id/stops/:stopId - Cập nhật điểm dừng
+- PUT /api/delivery-routes/:id/complete - Hoàn thành tuyến
+- POST /api/exceptions - Ghi nhận sự cố
+- PUT /api/exceptions/:id/resolve - Giải quyết sự cố
+- GET /api/performance-metrics/* - Xem hiệu suất
+
+LƯU Ý:
+- Tối ưu tuyến đường để giảm thời gian và chi phí
+- Theo dõi real-time tiến độ giao hàng
+- Xử lý sự cố nhanh chóng, ưu tiên CRITICAL
+- Ghi nhận đầy đủ thông tin để phân tích sau
+
+23. MANAGER (Quản lý vận hành)
+--------------------------------------------------------------------------------
+
+NHIỆM VỤ CHÍNH:
+1. Quản lý master data (sản phẩm, công thức, danh mục)
+2. Theo dõi hiệu suất toàn hệ thống
+3. Phê duyệt đơn hàng và yêu cầu
+4. Điều chỉnh tồn kho
+5. Phân tích và báo cáo
+
+WORKFLOW HÀNG TUẦN:
+
+HÀNG NGÀY:
+1. Xem dashboard tổng quan
+   - GET /api/dashboard/overview?start_date={today}&end_date={today}
+   - Kiểm tra KPIs: orders, production, shipments, inventory
+
+2. Xem cảnh báo
+   - GET /api/alerts/summary
+   - Xử lý cảnh báo CRITICAL và HIGH
+
+3. Phê duyệt đơn hàng quan trọng
+   - GET /api/internal-orders?status=SUBMITTED
+   - PUT /api/internal-orders/:id/status { status: "APPROVED" }
+
+4. Xem sự cố
+   - GET /api/exceptions?severity=CRITICAL
+   - Hỗ trợ Supply Coordinator xử lý
+
+HÀNG TUẦN:
+5. Phân tích đơn hàng
+   - GET /api/dashboard/orders?start_date={week_start}&end_date={week_end}
+   - Xem trend, top stores
+   - Dự báo nhu cầu tuần sau
+
+6. Phân tích sản xuất
+   - GET /api/dashboard/production?start_date={week_start}&end_date={week_end}
+   - Xem efficiency rate
+   - Tối ưu công thức nếu cần
+
+7. Phân tích tồn kho
+   - GET /api/dashboard/inventory
+   - Kiểm tra tồn kho theo location
+   - Điều chỉnh nếu cần: POST /api/inventory/adjust
+
+8. Xem hiệu suất giao hàng
+   - GET /api/performance-metrics/delivery-performance
+   - Đánh giá on_time_rate
+   - Cải thiện quy trình nếu cần
+
+HÀNG THÁNG:
+9. Quản lý sản phẩm
+   - Thêm sản phẩm mới: POST /api/items
+   - Cập nhật giá: PUT /api/items/:id
+   - Ngừng sản phẩm: DELETE /api/items/:id
+
+10. Quản lý công thức
+    - Tạo công thức mới: POST /api/recipes
+    - Cập nhật công thức: PUT /api/recipes/:id
+    - Thêm/xóa nguyên liệu: POST/DELETE /api/recipes/:id/lines
+
+11. Báo cáo tổng hợp
+    - Xuất báo cáo đơn hàng, sản xuất, tồn kho
+    - Phân tích chi phí và lợi nhuận
+    - Đề xuất cải tiến
+
+CÁC API THƯỜNG DÙNG:
+- GET /api/dashboard/* - Dashboard và analytics
+- GET /api/performance-metrics/* - Hiệu suất
+- POST /api/items - Quản lý sản phẩm
+- POST /api/recipes - Quản lý công thức
+- POST /api/inventory/adjust - Điều chỉnh tồn kho
+- GET /api/alerts/* - Cảnh báo
+- GET /api/exceptions - Sự cố
+
+LƯU Ý:
+- Theo dõi KPIs hàng ngày
+- Phân tích trend để dự báo
+- Tối ưu công thức sản xuất
+- Cải thiện quy trình liên tục
+
+24. ADMIN (Quản trị hệ thống)
+--------------------------------------------------------------------------------
+
+NHIỆM VỤ CHÍNH:
+1. Quản lý người dùng và phân quyền
+2. Cấu hình hệ thống
+3. Quản lý đơn vị tổ chức và vị trí kho
+4. Backup và bảo mật
+
+WORKFLOW:
+
+THIẾT LẬP BAN ĐẦU:
+1. Tạo Organization Units
+   - POST /api/master-data/org-units
+   - Tạo bếp trung tâm (type: KITCHEN)
+   - Tạo các cửa hàng (type: STORE)
+
+2. Tạo Locations
+   - POST /api/master-data/locations
+   - Tạo kho cho mỗi org unit
+   - Ví dụ: Kho nguyên liệu, Kho thành phẩm
+
+3. Tạo Master Data
+   - POST /api/master-data/categories - Danh mục
+   - POST /api/master-data/suppliers - Nhà cung cấp
+   - POST /api/master-data/uoms - Đơn vị tính (nếu cần thêm)
+
+QUẢN LÝ NGƯỜI DÙNG:
+4. Tạo user mới
+   - POST /api/auth/register
+   - Gán org_unit_id và role_ids
+   - Gửi email setup password: POST /api/auth/send-password-setup/:userId
+
+5. Quản lý roles
+   - Gán thêm roles: POST /api/users/:id/roles
+   - Xóa roles: DELETE /api/users/:id/roles
+
+6. Quản lý trạng thái user
+   - Cập nhật: PUT /api/users/:id
+   - Vô hiệu hóa: PUT /api/users/:id { status: "INACTIVE" }
+   - Xóa: DELETE /api/users/:id
+
+7. Reset password
+   - PUT /api/auth/reset-password/:userId
+
+HÀNG NGÀY:
+8. Kiểm tra hệ thống
+   - Xem logs
+   - Kiểm tra performance
+   - Xem exceptions: GET /api/exceptions
+
+9. Backup database
+   - Chạy script backup MongoDB
+   - Lưu trữ an toàn
+
+HÀNG TUẦN:
+10. Xem báo cáo tổng hợp
+    - GET /api/dashboard/overview
+    - Kiểm tra toàn bộ hệ thống
+
+11. Kiểm tra bảo mật
+    - Review user access logs
+    - Kiểm tra failed login attempts
+    - Cập nhật security policies
+
+HÀNG THÁNG:
+12. Quản lý org units
+    - Thêm cửa hàng mới: POST /api/master-data/org-units
+    - Cập nhật thông tin: PUT /api/master-data/org-units/:id
+    - Đóng cửa hàng: PUT /api/master-data/org-units/:id { status: "INACTIVE" }
+
+13. Audit và compliance
+    - Review tất cả transactions
+    - Kiểm tra data integrity
+    - Đảm bảo tuân thủ quy định
+
+CÁC API THƯỜNG DÙNG:
+- POST /api/auth/register - Tạo user
+- GET /api/users - Quản lý user
+- POST /api/users/:id/roles - Gán roles
+- POST /api/master-data/org-units - Tạo org unit
+- POST /api/master-data/locations - Tạo location
+- GET /api/dashboard/overview - Tổng quan hệ thống
+
+LƯU Ý:
+- Backup database thường xuyên
+- Theo dõi security logs
+- Phân quyền chính xác theo vai trò
+- Đảm bảo data integrity
+
+================================================================================
+KẾT THÚC TÀI LIỆU
+================================================================================
+
+Tài liệu này cung cấp tổng quan đầy đủ về hệ thống quản lý chuỗi franchise
+từ bếp trung tâm đến cửa hàng, bao gồm:
+
+✓ 8 Flow nghiệp vụ chính
+✓ 45+ API endpoints chi tiết
+✓ Hướng dẫn sử dụng cho 5 vai trò
+✓ Best practices và lưu ý quan trọng
+
+Để biết thêm chi tiết:
+- API Documentation: http://localhost:5001/api-docs
+- Test Guide: TEST_GUIDE.md
+- Frontend Guide: FRONTEND_API_GUIDE.md
+- Admin Flow: ADMIN_FLOW_GUIDE.md
+
+Liên hệ hỗ trợ: support@centralkitchen.com
+

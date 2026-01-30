@@ -6,7 +6,7 @@ const { protect } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Notifications
+ *   name: 10. Alerts & Notifications
  *   description: Real-time notification management
  */
 
@@ -54,7 +54,7 @@ router.use(protect);
  * /api/notifications:
  *   get:
  *     summary: Get user notifications
- *     tags: [Notifications]
+ *     tags: [10. Alerts & Notifications]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -95,7 +95,7 @@ router.get('/', notificationController.getNotifications);
  * /api/notifications/read-all:
  *   put:
  *     summary: Mark all notifications as read
- *     tags: [Notifications]
+ *     tags: [10. Alerts & Notifications]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -109,7 +109,7 @@ router.put('/read-all', notificationController.markAllAsRead);
  * /api/notifications/{id}/read:
  *   put:
  *     summary: Mark a single notification as read
- *     tags: [Notifications]
+ *     tags: [10. Alerts & Notifications]
  *     security:
  *       - bearerAuth: []
  *     parameters:

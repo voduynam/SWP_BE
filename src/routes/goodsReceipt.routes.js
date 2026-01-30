@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Goods Receipts
+ *   name: 6. Receipt Flow
  *   description: Receiving inventory from Central Kitchen or Suppliers
  */
 
@@ -18,7 +18,7 @@ router.use(protect);
  * /api/goods-receipts:
  *   get:
  *     summary: Get all goods receipts
- *     tags: [Goods Receipts]
+ *     tags: [6. Receipt Flow]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -32,7 +32,7 @@ router.get('/', goodsReceiptController.getGoodsReceipts);
  * /api/goods-receipts/{id}:
  *   get:
  *     summary: Get single goods receipt with lines
- *     tags: [Goods Receipts]
+ *     tags: [6. Receipt Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -52,7 +52,7 @@ router.get('/:id', goodsReceiptController.getGoodsReceipt);
  * /api/goods-receipts:
  *   post:
  *     summary: Create goods receipt from shipment
- *     tags: [Goods Receipts]
+ *     tags: [6. Receipt Flow]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -75,7 +75,7 @@ router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), goodsReceiptContr
  * /api/goods-receipts/{id}/confirm:
  *   put:
  *     summary: Confirm goods receipt (update inventory)
- *     tags: [Goods Receipts]
+ *     tags: [6. Receipt Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:

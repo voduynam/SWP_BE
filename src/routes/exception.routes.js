@@ -13,7 +13,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Exceptions
+ *   name: 9. Supply Coordination
  *   description: Exception reporting and management
  */
 
@@ -60,7 +60,7 @@ router.use(protect);
  * /api/exceptions/summary:
  *   get:
  *     summary: Get exception summary
- *     tags: [Exceptions]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -75,7 +75,7 @@ router.route('/summary')
  * /api/exceptions:
  *   get:
  *     summary: Get all exceptions
- *     tags: [Exceptions]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -83,7 +83,7 @@ router.route('/summary')
  *         description: List of exceptions
  *   post:
  *     summary: Create exception
- *     tags: [Exceptions]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -116,7 +116,7 @@ router.route('/')
  * /api/exceptions/{id}:
  *   get:
  *     summary: Get single exception
- *     tags: [Exceptions]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -130,7 +130,7 @@ router.route('/')
  *         description: Exception details
  *   put:
  *     summary: Update exception
- *     tags: [Exceptions]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -158,7 +158,7 @@ router.route('/:id')
  * /api/exceptions/{id}/resolve:
  *   put:
  *     summary: Resolve exception
- *     tags: [Exceptions]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:

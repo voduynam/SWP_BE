@@ -6,7 +6,7 @@ const { protect } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Alerts
+ *   name: 10. Alerts & Notifications
  *   description: Automated inventory and expiry alerts
  */
 
@@ -18,7 +18,7 @@ router.use(protect);
  * /api/alerts/expiry:
  *   get:
  *     summary: Get items approaching expiry
- *     tags: [Alerts]
+ *     tags: [10. Alerts & Notifications]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -32,7 +32,7 @@ router.get('/expiry', alertController.getExpiryAlerts);
  * /api/alerts/low-stock:
  *   get:
  *     summary: Get items with low stock levels
- *     tags: [Alerts]
+ *     tags: [10. Alerts & Notifications]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -46,7 +46,7 @@ router.get('/low-stock', alertController.getLowStockAlerts);
  * /api/alerts/summary:
  *   get:
  *     summary: Get count of all active alerts
- *     tags: [Alerts]
+ *     tags: [10. Alerts & Notifications]
  *     security:
  *       - bearerAuth: []
  *     responses:

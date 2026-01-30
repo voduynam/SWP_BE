@@ -6,8 +6,8 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Internal Orders
- *   description: Store-to-Kitchen internal order management
+ *   name: 3. Order Flow
+ *   description: 📝 Internal Orders - Create → Submit → Approve → Process
  */
 
 /**
@@ -56,7 +56,7 @@ router.use(protect);
  * /api/internal-orders:
  *   get:
  *     summary: Get all internal orders
- *     tags: [Internal Orders]
+ *     tags: [3. Order Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -79,7 +79,7 @@ router.get('/', internalOrderController.getInternalOrders);
  * /api/internal-orders/{id}:
  *   get:
  *     summary: Get single internal order with lines
- *     tags: [Internal Orders]
+ *     tags: [3. Order Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -99,7 +99,7 @@ router.get('/:id', internalOrderController.getInternalOrder);
  * /api/internal-orders:
  *   post:
  *     summary: Create internal order
- *     tags: [Internal Orders]
+ *     tags: [3. Order Flow]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -126,7 +126,7 @@ router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), internalOrderCont
  * /api/internal-orders/{id}/status:
  *   put:
  *     summary: Update internal order status
- *     tags: [Internal Orders]
+ *     tags: [3. Order Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -156,7 +156,7 @@ router.put('/:id/status', internalOrderController.updateOrderStatus);
  * /api/internal-orders/{id}/lines:
  *   post:
  *     summary: Add line to internal order
- *     tags: [Internal Orders]
+ *     tags: [3. Order Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:

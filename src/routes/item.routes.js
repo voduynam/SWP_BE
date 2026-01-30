@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Items
+ *   name: 2. Master Data
  *   description: Item and product catalog management
  */
 
@@ -42,7 +42,7 @@ router.use(protect);
  * /api/items:
  *   get:
  *     summary: Get all items
- *     tags: [Items]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -56,7 +56,7 @@ router.get('/', itemController.getItems);
  * /api/items/{id}:
  *   get:
  *     summary: Get single item
- *     tags: [Items]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -76,7 +76,7 @@ router.get('/:id', itemController.getItem);
  * /api/items:
  *   post:
  *     summary: Create item
- *     tags: [Items]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -96,7 +96,7 @@ router.post('/', authorize('MANAGER', 'ADMIN'), itemController.createItem);
  * /api/items/{id}:
  *   put:
  *     summary: Update item
- *     tags: [Items]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -122,7 +122,7 @@ router.put('/:id', authorize('MANAGER', 'ADMIN'), itemController.updateItem);
  * /api/items/{id}:
  *   delete:
  *     summary: Delete item (soft delete)
- *     tags: [Items]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:

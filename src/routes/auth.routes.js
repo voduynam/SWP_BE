@@ -7,8 +7,8 @@ const { validateLogin, validateRegister } = require('../middlewares/validator');
 /**
  * @swagger
  * tags:
- *   name: Authentication
- *   description: User authentication and authorization APIs
+ *   name: 1. Authentication
+ *   description: 🔐 Login, Register, Password Management
  */
 
 /**
@@ -117,7 +117,7 @@ const { validateLogin, validateRegister } = require('../middlewares/validator');
  * /api/auth/register:
  *   post:
  *     summary: Register a new user (Admin only)
- *     tags: [Authentication]
+ *     tags: [1. Authentication]
  *     description: Admin creates a new user account with organization unit and role assignments
  *     security:
  *       - bearerAuth: []
@@ -191,7 +191,7 @@ const { validateLogin, validateRegister } = require('../middlewares/validator');
  * /api/auth/login:
  *   post:
  *     summary: User login
- *     tags: [Authentication]
+ *     tags: [1. Authentication]
  *     description: Authenticate user and receive JWT token
  *     security: []
  *     requestBody:
@@ -298,7 +298,7 @@ router.put('/reset-password/:userId', protect, authorize('ADMIN'), authControlle
  * /api/auth/send-password-setup/{userId}:
  *   post:
  *     summary: Send password setup link (Admin only)
- *     tags: [Authentication]
+ *     tags: [1. Authentication]
  *     description: Admin sends email with password setup link to user
  *     security:
  *       - bearerAuth: []
@@ -351,7 +351,7 @@ router.post('/send-password-setup/:userId', protect, authorize('ADMIN'), authCon
  * /api/auth/set-password:
  *   post:
  *     summary: Set password using token
- *     tags: [Authentication]
+ *     tags: [1. Authentication]
  *     description: User sets their password using the token received via email
  *     security: []
  *     requestBody:

@@ -14,7 +14,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Delivery Routes
+ *   name: 9. Supply Coordination
  *   description: Route planning and delivery tracking
  */
 
@@ -26,7 +26,7 @@ router.use(protect);
  * /api/delivery-routes:
  *   get:
  *     summary: Get all delivery routes
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -34,7 +34,7 @@ router.use(protect);
  *         description: List of delivery routes
  *   post:
  *     summary: Create new delivery route
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -61,7 +61,7 @@ router.route('/')
  * /api/delivery-routes/{id}:
  *   get:
  *     summary: Get single delivery route with stops
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -75,7 +75,7 @@ router.route('/')
  *         description: Route details
  *   put:
  *     summary: Update delivery route
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -97,7 +97,7 @@ router.route('/:id')
  * /api/delivery-routes/{id}/status:
  *   put:
  *     summary: Update overall route status
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -128,7 +128,7 @@ router.route('/:id/status')
  * /api/delivery-routes/{id}/stops:
  *   post:
  *     summary: Add stop to delivery route
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -149,7 +149,7 @@ router.route('/:id/stops')
  * /api/delivery-routes/{id}/stops/{stopId}/status:
  *   put:
  *     summary: Update status of a specific stop
- *     tags: [Delivery Routes]
+ *     tags: [9. Supply Coordination]
  *     security:
  *       - bearerAuth: []
  *     parameters:
