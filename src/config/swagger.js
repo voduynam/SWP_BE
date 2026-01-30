@@ -5,18 +5,68 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'SWP391 Backend API Documentation',
+      title: 'Central Kitchen & Franchise Management System API',
       version: '1.0.0',
-      description: 'API documentation for SWP391 Warehouse Management System',
+      description: 'API documentation organized by business workflow - From Order to Delivery',
       contact: {
         name: 'API Support',
-        email: 'support@swp391.com'
+        email: 'support@centralkitchen.com'
       }
     },
     servers: [
       {
-        url: `http://localhost:${config.port || 3000}`,
+        url: `http://localhost:${config.port || 5001}`,
         description: 'Development server'
+      }
+    ],
+    tags: [
+      {
+        name: '1. Authentication',
+        description: '🔐 Login, Register, Password Management'
+      },
+      {
+        name: '2. Master Data',
+        description: '📋 Categories, Suppliers, Org Units, Locations, Items, Recipes'
+      },
+      {
+        name: '3. Order Flow',
+        description: '📝 Internal Orders: Create → Submit → Approve → Process'
+      },
+      {
+        name: '4. Production Flow', 
+        description: '🏭 Production Orders: Plan → Execute → Record Output'
+      },
+      {
+        name: '5. Shipment Flow',
+        description: '🚚 Shipments: Create → Ship → Track Delivery'
+      },
+      {
+        name: '6. Receipt Flow',
+        description: '📦 Goods Receipts: Receive → Inspect → Confirm'
+      },
+      // {
+      //   name: '7. Return Flow',
+      //   description: '↩️ Return Requests: Request → Approve → Process'
+      // },
+      {
+        name: '7. Inventory Management',
+        description: '📊 Inventory Balances, Transactions, Adjustments, Lots'
+      },
+      {
+        name: '8. Supply Coordination',
+        description: '🚛 Consolidated Orders, Delivery Routes, Exception Handling'
+      },
+      {
+        name: '9. Alerts & Notifications',
+        description: '🔔 Expiry Alerts, Low Stock, Real-time Notifications'
+      },
+      {
+        name: '10. Dashboard & Analytics',
+        description: '📈 Performance Metrics, Reports, Business Intelligence'
+      },
+      {
+        name: '11. User Management',
+        description: '👥 User Administration, Role Management'
       }
     ],
     components: {

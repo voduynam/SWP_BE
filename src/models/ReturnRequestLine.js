@@ -1,3 +1,11 @@
+// ============================================================================
+// RETURN REQUEST LINE MODEL - CURRENTLY DISABLED
+// ============================================================================
+// This model defines the return request line schema
+// Currently commented out as it's not needed for the current project phase
+// ============================================================================
+
+/*
 const mongoose = require('mongoose');
 
 const returnRequestLineSchema = new mongoose.Schema({
@@ -48,3 +56,4 @@ const returnRequestLineSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('ReturnRequestLine', returnRequestLineSchema, 'return_request_line');
+*/

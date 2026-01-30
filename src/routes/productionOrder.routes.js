@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Production Orders
+ *   name: 4. Production Flow
  *   description: Central Kitchen production management
  */
 
@@ -48,7 +48,7 @@ router.use(protect);
  * /api/production-orders:
  *   get:
  *     summary: Get all production orders
- *     tags: [Production Orders]
+ *     tags: [4. Production Flow]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -62,7 +62,7 @@ router.get('/', productionOrderController.getProductionOrders);
  * /api/production-orders/{id}:
  *   get:
  *     summary: Get single production order with lines
- *     tags: [Production Orders]
+ *     tags: [4. Production Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -82,7 +82,7 @@ router.get('/:id', productionOrderController.getProductionOrder);
  * /api/production-orders:
  *   post:
  *     summary: Create production order
- *     tags: [Production Orders]
+ *     tags: [4. Production Flow]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -107,7 +107,7 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderControlle
  * /api/production-orders/{id}/status:
  *   put:
  *     summary: Update production order status
- *     tags: [Production Orders]
+ *     tags: [4. Production Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -137,7 +137,7 @@ router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrder
  * /api/production-orders/{id}/consumption:
  *   post:
  *     summary: Record production consumption
- *     tags: [Production Orders]
+ *     tags: [4. Production Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -170,7 +170,7 @@ router.post('/:id/consumption', authorize('CHEF', 'MANAGER', 'ADMIN'), productio
  * /api/production-orders/{id}/output:
  *   post:
  *     summary: Record production output
- *     tags: [Production Orders]
+ *     tags: [4. Production Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:

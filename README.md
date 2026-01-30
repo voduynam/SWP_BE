@@ -64,11 +64,11 @@ Backend API được xây dựng với Node.js, Express và MongoDB, cung cấp 
 - Inventory adjustment
 - Multi-location inventory
 
-### 🔄 Return/Refund Flow ⭐ NEW
-- Xử lý hàng trả lại từ cửa hàng
-- Defect type tracking
-- Tự động cập nhật tồn kho
-- Approval workflow
+### 🔄 Return/Refund Flow ⭐ DISABLED
+- ~~Xử lý hàng trả lại từ cửa hàng~~ (Currently disabled - not needed for current project phase)
+- ~~Defect type tracking~~
+- ~~Tự động cập nhật tồn kho~~
+- ~~Approval workflow~~
 
 ### ⚠️ Alert System ⭐ NEW
 - Expiry alerts (EXPIRED, CRITICAL, HIGH, MEDIUM)
@@ -588,7 +588,7 @@ npm run schema:export
 ## 📝 Changelog
 
 ### Version 1.1.0 (2024-01-18) ⭐ NEW
-- ✅ Added Return/Refund Flow
+- ~~✅ Added Return/Refund Flow~~ (Currently disabled)
 - ✅ Added Expiry Alert System
 - ✅ Added Low Stock Alerts
 - ✅ Added Dashboard & Analytics
@@ -639,7 +639,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Phase 1 (Q1 2024) ✅
 - [x] Core features implementation
-- [x] Return/Refund flow
+- ~~[x] Return/Refund flow~~ (Currently disabled)
 - [x] Alert system
 - [x] Dashboard
 - [x] Validation rules

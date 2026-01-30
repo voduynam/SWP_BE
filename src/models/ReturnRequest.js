@@ -1,58 +1,17 @@
+// ============================================================================
+// RETURN REQUEST MODEL - CURRENTLY DISABLED
+// ============================================================================
+// This model defines the return request schema
+// Currently commented out as it's not needed for the current project phase
+// ============================================================================
+
 const mongoose = require('mongoose');
 
+// Empty schema when disabled
 const returnRequestSchema = new mongoose.Schema({
-  _id: {
-    type: String,
-    required: true
-  },
-  return_no: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  store_org_unit_id: {
-    type: String,
-    required: true,
-    ref: 'OrgUnit'
-  },
-  goods_receipt_id: {
-    type: String,
-    ref: 'GoodsReceipt'
-  },
-  return_date: {
-    type: Date,
-    required: true,
-    default: Date.now
-  },
-  reason: {
-    type: String,
-    default: ''
-  },
-  status: {
-    type: String,
-    enum: ['PENDING', 'APPROVED', 'REJECTED', 'PROCESSING', 'COMPLETED', 'CANCELLED'],
-    default: 'PENDING'
-  },
-  resolution_notes: {
-    type: String,
-    default: ''
-  },
-  created_by: {
-    type: String,
-    required: true,
-    ref: 'AppUser'
-  },
-  created_at: {
-    type: Date,
-    default: Date.now
-  },
-  updated_at: {
-    type: Date,
-    default: Date.now
-  }
+  // Schema is disabled
 }, {
-  _id: false,
-  timestamps: false
+  collection: 'return_request_disabled'
 });
 
-module.exports = mongoose.model('ReturnRequest', returnRequestSchema, 'return_request');
+module.exports = mongoose.model('ReturnRequest', returnRequestSchema);

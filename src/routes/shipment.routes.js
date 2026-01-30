@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Shipments
+ *   name: 5. Shipment Flow
  *   description: Logistics and shipment management
  */
 
@@ -54,7 +54,7 @@ router.use(protect);
  * /api/shipments:
  *   get:
  *     summary: Get all shipments
- *     tags: [Shipments]
+ *     tags: [5. Shipment Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -73,7 +73,7 @@ router.get('/', shipmentController.getShipments);
  * /api/shipments/{id}:
  *   get:
  *     summary: Get single shipment with lines
- *     tags: [Shipments]
+ *     tags: [5. Shipment Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -93,7 +93,7 @@ router.get('/:id', shipmentController.getShipment);
  * /api/shipments:
  *   post:
  *     summary: Create shipment from order
- *     tags: [Shipments]
+ *     tags: [5. Shipment Flow]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -124,7 +124,7 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.creat
  * /api/shipments/{id}/status:
  *   put:
  *     summary: Update shipment status
- *     tags: [Shipments]
+ *     tags: [5. Shipment Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -154,7 +154,7 @@ router.put('/:id/status', shipmentController.updateShipmentStatus);
  * /api/shipments/{id}/dispatch:
  *   put:
  *     summary: Confirm shipment dispatch (Deduct stock from CK)
- *     tags: [Shipments]
+ *     tags: [5. Shipment Flow]
  *     security:
  *       - bearerAuth: []
  *     parameters:

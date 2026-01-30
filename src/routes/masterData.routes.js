@@ -6,8 +6,8 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   - name: Master Data
- *     description: Master data management (Categories, Suppliers, OrgUnits, Locations, Roles)
+ *   - name: 2. Master Data
+ *     description: 📋 Categories, Suppliers, Org Units, Locations, Items, Recipes
  */
 
 /**
@@ -84,7 +84,7 @@ router.use(protect);
  * /api/master-data/uoms:
  *   get:
  *     summary: Get all units of measure
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -98,7 +98,7 @@ router.get('/uoms', masterDataController.getUOMs);
  * /api/master-data/uoms/{id}:
  *   get:
  *     summary: Get single unit of measure
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -120,7 +120,7 @@ router.get('/uoms/:id', masterDataController.getUOM);
  * /api/master-data/categories:
  *   get:
  *     summary: Get all categories
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -134,7 +134,7 @@ router.get('/categories', masterDataController.getCategories);
  * /api/master-data/categories/{id}:
  *   get:
  *     summary: Get single category
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -154,7 +154,7 @@ router.get('/categories/:id', masterDataController.getCategory);
  * /api/master-data/categories:
  *   post:
  *     summary: Create new category
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -181,7 +181,7 @@ router.post('/categories', authorize('MANAGER', 'ADMIN'), masterDataController.c
  * /api/master-data/suppliers:
  *   get:
  *     summary: Get all suppliers
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -195,7 +195,7 @@ router.get('/suppliers', masterDataController.getSuppliers);
  * /api/master-data/suppliers/{id}:
  *   get:
  *     summary: Get single supplier
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -215,7 +215,7 @@ router.get('/suppliers/:id', masterDataController.getSupplier);
  * /api/master-data/suppliers:
  *   post:
  *     summary: Create new supplier
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -242,7 +242,7 @@ router.post('/suppliers', authorize('MANAGER', 'ADMIN'), masterDataController.cr
  * /api/master-data/org-units:
  *   get:
  *     summary: Get all organization units
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     description: Retrieve list of all organization units (stores, kitchens)
  *     parameters:
  *       - in: query
@@ -274,7 +274,7 @@ router.post('/suppliers', authorize('MANAGER', 'ADMIN'), masterDataController.cr
  *                     type: object
  *   post:
  *     summary: Create new organization unit (Admin only)
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     description: Create a new store or kitchen
  *     security:
  *       - bearerAuth: []
@@ -324,7 +324,7 @@ router.post('/org-units', authorize('ADMIN'), masterDataController.createOrgUnit
  * /api/master-data/locations:
  *   get:
  *     summary: Get all locations
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     description: Retrieve list of all storage locations within organization units
  *     parameters:
  *       - in: query
@@ -343,7 +343,7 @@ router.post('/org-units', authorize('ADMIN'), masterDataController.createOrgUnit
  *         description: List of locations
  *   post:
  *     summary: Create new location
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     description: Create a new storage location for an organization unit
  *     security:
  *       - bearerAuth: []
@@ -376,7 +376,7 @@ router.post('/locations', authorize('MANAGER', 'ADMIN'), masterDataController.cr
  * /api/master-data/roles:
  *   get:
  *     summary: Get all roles
- *     tags: [Master Data]
+ *     tags: [2. Master Data]
  *     description: Retrieve list of all available roles in the system
  *     responses:
  *       200:

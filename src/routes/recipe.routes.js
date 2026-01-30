@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middlewares/auth');
 /**
  * @swagger
  * tags:
- *   name: Recipes
+ *   name: 2. Master Data
  *   description: Production recipe management
  */
 
@@ -48,7 +48,7 @@ router.use(protect);
  * /api/recipes:
  *   get:
  *     summary: Get all recipes
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -67,7 +67,7 @@ router.get('/', recipeController.getRecipes);
  * /api/recipes/{id}:
  *   get:
  *     summary: Get single recipe with lines
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -87,7 +87,7 @@ router.get('/:id', recipeController.getRecipe);
  * /api/recipes:
  *   post:
  *     summary: Create recipe
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -116,7 +116,7 @@ router.post('/', authorize('MANAGER', 'ADMIN'), recipeController.createRecipe);
  * /api/recipes/{id}:
  *   put:
  *     summary: Update recipe
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -142,7 +142,7 @@ router.put('/:id', authorize('MANAGER', 'ADMIN'), recipeController.updateRecipe)
  * /api/recipes/{id}/status:
  *   put:
  *     summary: Toggle recipe status
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -162,7 +162,7 @@ router.put('/:id/status', authorize('MANAGER', 'ADMIN'), recipeController.toggle
  * /api/recipes/{id}/lines:
  *   post:
  *     summary: Add line to recipe
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -187,7 +187,7 @@ router.post('/:id/lines', authorize('MANAGER', 'ADMIN'), recipeController.addRec
  * /api/recipes/{id}/lines/{lineId}:
  *   delete:
  *     summary: Delete recipe line
- *     tags: [Recipes]
+ *     tags: [2. Master Data]
  *     security:
  *       - bearerAuth: []
  *     parameters:
