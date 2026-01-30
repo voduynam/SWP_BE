@@ -58,7 +58,7 @@ exports.getRecipe = asyncHandler(async (req, res) => {
 // @route   POST /api/recipes
 // @access  Private (Manager, Admin)
 exports.createRecipe = asyncHandler(async (req, res) => {
-  const { _id, item_id, version, effective_from, effective_to, lines } = req.body;
+  const { _id, item_id, version, status, effective_from, effective_to, lines } = req.body;
 
   if (!lines || lines.length === 0) {
     return res.status(400).json(
@@ -74,12 +74,22 @@ exports.createRecipe = asyncHandler(async (req, res) => {
     );
   }
 
+  const recipeStatus = status || 'ACTIVE';
+
+  // If new recipe is ACTIVE, set all other recipes for this item to INACTIVE
+  if (recipeStatus === 'ACTIVE') {
+    await Recipe.updateMany(
+      { item_id, status: 'ACTIVE' },
+      { status: 'INACTIVE', updated_at: new Date() }
+    );
+  }
+
   // Create recipe
   const recipe = await Recipe.create({
     _id: _id || `recipe_${Date.now()}`,
     item_id,
     version,
-    status: 'ACTIVE',
+    status: recipeStatus,
     effective_from: effective_from || new Date(),
     effective_to: effective_to || null
   });
@@ -119,6 +129,14 @@ exports.updateRecipe = asyncHandler(async (req, res) => {
     );
   }
 
+  // If status is being changed to ACTIVE, deactivate others first
+  if (req.body.status === 'ACTIVE' && recipe.status !== 'ACTIVE') {
+    await Recipe.updateMany(
+      { item_id: recipe.item_id, status: 'ACTIVE' },
+      { status: 'INACTIVE', updated_at: new Date() }
+    );
+  }
+
   // Update recipe
   const updatedRecipe = await Recipe.findByIdAndUpdate(
     req.params.id,
@@ -128,6 +146,36 @@ exports.updateRecipe = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     ApiResponse.success(updatedRecipe, 'Recipe updated successfully')
+  );
+});
+
+// @desc    Toggle recipe status
+// @route   PUT /api/recipes/:id/status
+// @access  Private (Manager, Admin)
+exports.toggleRecipeStatus = asyncHandler(async (req, res) => {
+  const recipe = await Recipe.findById(req.params.id);
+  if (!recipe) {
+    return res.status(404).json(
+      ApiResponse.error('Recipe not found', 404)
+    );
+  }
+
+  const newStatus = recipe.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
+  // If activating, deactivate all other recipes for this item
+  if (newStatus === 'ACTIVE') {
+    await Recipe.updateMany(
+      { item_id: recipe.item_id, status: 'ACTIVE' },
+      { status: 'INACTIVE', updated_at: new Date() }
+    );
+  }
+
+  recipe.status = newStatus;
+  recipe.updated_at = new Date();
+  await recipe.save();
+
+  return res.status(200).json(
+    ApiResponse.success(recipe, `Recipe status updated to ${newStatus}`)
   );
 });
 

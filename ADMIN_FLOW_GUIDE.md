@@ -176,7 +176,7 @@ CLIENT_URL=http://localhost:3000
 ## 🚀 Testing với Swagger
 
 1. Start server: `npm run dev`
-2. Mở Swagger UI: http://localhost:3000/api-docs
+2. Mở Swagger UI: http://localhost:5001/api-docs
 
 ### Test flow đầy đủ:
 

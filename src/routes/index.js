@@ -16,6 +16,11 @@ const masterDataRoutes = require('./masterData.routes');
 const returnRequestRoutes = require('./returnRequest.routes');
 const alertRoutes = require('./alert.routes');
 const dashboardRoutes = require('./dashboard.routes');
+const deliveryRouteRoutes = require('./deliveryRoute.routes');
+const consolidatedOrderRoutes = require('./consolidatedOrder.routes');
+const exceptionRoutes = require('./exception.routes');
+const performanceMetricsRoutes = require('./performanceMetrics.routes');
+const notificationRoutes = require('./notification.routes');
 
 // Define routes
 router.use('/auth', authRoutes);
@@ -32,6 +37,11 @@ router.use('/master-data', masterDataRoutes);
 router.use('/return-requests', returnRequestRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/delivery-routes', deliveryRouteRoutes);
+router.use('/consolidated-orders', consolidatedOrderRoutes);
+router.use('/exceptions', exceptionRoutes);
+router.use('/performance-metrics', performanceMetricsRoutes);
+router.use('/notifications', notificationRoutes);
 
 // Default route
 router.get('/', (req, res) => {
@@ -52,7 +62,11 @@ router.get('/', (req, res) => {
       'master-data': '/api/master-data',
       'return-requests': '/api/return-requests',
       alerts: '/api/alerts',
-      dashboard: '/api/dashboard'
+      dashboard: '/api/dashboard',
+      'delivery-routes': '/api/delivery-routes',
+      'consolidated-orders': '/api/consolidated-orders',
+      exceptions: '/api/exceptions',
+      'performance-metrics': '/api/performance-metrics'
     }
   });
 });

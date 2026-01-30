@@ -22,6 +22,9 @@ npm run dev
 http://localhost:5001/api-docs
 ```
 
+> [!TIP]
+> Swagger UI là công cụ được khuyến nghị để test các workflow này vì nó hỗ trợ Authorize token dễ dàng.
+
 ---
 
 ## 🎯 TEST WORKFLOW

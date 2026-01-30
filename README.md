@@ -1,13 +1,13 @@
-# 🍳 Central Kitchen and Franchise Store Management System - Backend API
+Backend API được xây dựng với Node.js, Express và MongoDB, cung cấp giải pháp quản lý đầy đủ cho chuỗi cung ứng từ bếp trung tâm (Central Kitchen) đến các cửa hàng franchise. Dự án hỗ trợ quản lý đơn hàng, sản xuất, tồn kho, và theo dõi lô hàng thời gian thực.
 
-> Hệ thống quản lý toàn diện cho mô hình bếp trung tâm và chuỗi cửa hàng franchise
+---
 
-[![Node.js](https://img.shields.io/badge/Node.js-v18+-green.svg)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-v4.18-blue.svg)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-v8.0-green.svg)](https://www.mongodb.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## ⚡ Quick Links
+- 📖 [API Documentation (Swagger UI)](http://localhost:5001/api-docs)
+- ✅ [Test Guide](./TEST_GUIDE.md)
+- 🏗️ [Implementation Details](./IMPLEMENTATION_GUIDE.md)
 
-Backend API được xây dựng với Node.js, Express và MongoDB, cung cấp giải pháp quản lý đầy đủ cho chuỗi cung ứng từ bếp trung tâm đến các cửa hàng franchise.
+---
 
 ---
 
@@ -111,27 +111,13 @@ Backend API được xây dựng với Node.js, Express và MongoDB, cung cấp 
 
 ---
 
-## 🛠️ Công nghệ sử dụng
-
-### Core Technologies
-- **Node.js** (v18+) - Runtime environment
-- **Express.js** (v4.18) - Web framework
-- **MongoDB** (v8.0) - NoSQL database
-- **Mongoose** (v8.0) - ODM for MongoDB
-
-### Security & Authentication
-- **JWT** (jsonwebtoken) - Token-based authentication
-- **Bcrypt.js** - Password hashing
-- **Helmet** - Security headers
-- **CORS** - Cross-Origin Resource Sharing
-
-### Validation & Utilities
-- **Express Validator** - Input validation
-- **Morgan** - HTTP request logger
-- **Dotenv** - Environment variables
-
-### Development Tools
-- **Nodemon** - Auto-restart on file changes
+### 🛠️ Công nghệ sử dụng
+- **Backend:** Node.js (v18+), Express.js (v4.18)
+- **Database:** MongoDB (v8.0), Mongoose (v8.0)
+- **Security:** JWT, Bcrypt.js, Helmet, CORS
+- **Real-time:** Socket.io
+- **Documentation:** Swagger JSDoc, Swagger UI
+- **Utilities:** Express Validator, Morgan, Dotenv, Nodemon
 
 ---
 
@@ -162,36 +148,13 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-### Bước 4: Cấu hình database
-Cập nhật file `.env` với thông tin MongoDB của bạn:
-```env
-MONGODB_URI=mongodb://localhost:27017/central_kitchen
-```
 
----
 
 ## ⚙️ Cấu hình
 
 ### Environment Variables
 
-Tạo file `.env` trong thư mục root với các biến sau:
-
-```env
-# Server Configuration
-PORT=5000
-NODE_ENV=development
-
-# Database
-MONGODB_URI=mongodb://localhost:27017/central_kitchen
-
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRE=7d
-
-# Client URL (for CORS)
-CLIENT_URL=http://localhost:3000
-```
-
+Tạo file `.env` trong thư mục root với các biến đã gửi riêng
 ### Database Setup
 
 1. **Cài đặt MongoDB:**
@@ -213,47 +176,16 @@ CLIENT_URL=http://localhost:3000
    use central_kitchen
    ```
 
----
+## 📖 Documentation & API Endpoints
 
-## 🏃 Chạy ứng dụng
+Hệ thống cung cấp tài liệu API đầy đủ qua Swagger UI. Các hướng dẫn chi tiết về luồng nghiệp vụ có thể tìm thấy trong các file guide.
 
-### Development mode (với auto-restart)
-```bash
-npm run dev
-```
-
-### Production mode
-```bash
-npm start
-```
-
-### Server sẽ chạy tại
-```
-http://localhost:5000
-```
-
-### Health Check
-```bash
-curl http://localhost:5000/health
-```
-
-**Response:**
-```json
-{
-  "status": "OK",
-  "message": "Server is running",
-  "timestamp": "2024-01-18T10:30:00.000Z"
-}
-```
-
----
-
-## 📚 API Documentation
+- � [API Documentation (Swagger UI)](http://localhost:5001/api-docs)
+- ✅ [Chi tiết API & Hướng dẫn Test](./TEST_GUIDE.md)
+- 🏗️ [Chi tiết Implementation](./IMPLEMENTATION_GUIDE.md)
 
 ### Base URL
-```
-http://localhost:5000/api
-```
+`http://localhost:5001/api`
 
 ### Authentication
 Hầu hết các endpoints yêu cầu JWT token trong header:
@@ -261,109 +193,8 @@ Hầu hết các endpoints yêu cầu JWT token trong header:
 Authorization: Bearer <your_jwt_token>
 ```
 
-### API Endpoints Overview
-
-#### 🔐 Authentication
-- `POST /api/auth/register` - Đăng ký user mới
-- `POST /api/auth/login` - Đăng nhập
-- `GET /api/auth/me` - Lấy thông tin user hiện tại
-- `POST /api/auth/logout` - Đăng xuất ⭐ NEW
-- `PUT /api/auth/change-password` - Đổi mật khẩu ⭐ NEW
-- `PUT /api/auth/reset-password/:userId` - Reset mật khẩu (Admin) ⭐ NEW
-
-#### 👥 Users
-- `GET /api/users` - Danh sách users
-- `GET /api/users/:id` - Chi tiết user
-- `PUT /api/users/:id` - Cập nhật user
-- `DELETE /api/users/:id` - Xóa user
-
-#### 📦 Items
-- `GET /api/items` - Danh sách items
-- `POST /api/items` - Tạo item mới
-- `GET /api/items/:id` - Chi tiết item
-- `PUT /api/items/:id` - Cập nhật item
-- `DELETE /api/items/:id` - Xóa item
-
-#### 🛒 Internal Orders
-- `GET /api/internal-orders` - Danh sách đơn hàng
-- `POST /api/internal-orders` - Tạo đơn hàng
-- `GET /api/internal-orders/:id` - Chi tiết đơn hàng
-- `PUT /api/internal-orders/:id/status` - Cập nhật trạng thái
-- `POST /api/internal-orders/:id/lines` - Thêm dòng vào đơn
-
-#### 🏭 Production Orders
-- `GET /api/production-orders` - Danh sách lệnh sản xuất
-- `POST /api/production-orders` - Tạo lệnh sản xuất
-- `GET /api/production-orders/:id` - Chi tiết lệnh sản xuất
-- `PUT /api/production-orders/:id/status` - Cập nhật trạng thái
-- `POST /api/production-orders/:id/consumption` - Ghi nhận tiêu hao
-- `POST /api/production-orders/:id/output` - Ghi nhận sản phẩm
-
-#### 🚚 Shipments
-- `GET /api/shipments` - Danh sách lô hàng
-- `POST /api/shipments` - Tạo lô hàng
-- `GET /api/shipments/:id` - Chi tiết lô hàng
-- `PUT /api/shipments/:id/status` - Cập nhật trạng thái
-
-#### 📥 Goods Receipts
-- `GET /api/goods-receipts` - Danh sách phiếu nhận hàng
-- `POST /api/goods-receipts` - Tạo phiếu nhận hàng
-- `GET /api/goods-receipts/:id` - Chi tiết phiếu nhận
-- `PUT /api/goods-receipts/:id/confirm` - Xác nhận và cập nhật tồn kho
-
-#### 📊 Inventory
-- `GET /api/inventory/balances` - Số dư tồn kho
-- `GET /api/inventory/transactions` - Lịch sử giao dịch
-- `GET /api/inventory/summary` - Tổng hợp tồn kho
-- `POST /api/inventory/adjust` - Điều chỉnh tồn kho
-
-#### 📖 Recipes
-- `GET /api/recipes` - Danh sách công thức
-- `POST /api/recipes` - Tạo công thức
-- `GET /api/recipes/:id` - Chi tiết công thức
-- `PUT /api/recipes/:id` - Cập nhật công thức
-- `POST /api/recipes/:id/lines` - Thêm dòng vào công thức
-- `DELETE /api/recipes/:id/lines/:lineId` - Xóa dòng công thức
-
-#### 🏷️ Lots
-- `GET /api/lots` - Danh sách lô hàng
-- `POST /api/lots` - Tạo lô hàng
-- `GET /api/lots/:id` - Chi tiết lô hàng
-- `PUT /api/lots/:id` - Cập nhật lô hàng
-
-#### 🔄 Return Requests ⭐ NEW
-- `GET /api/return-requests` - Danh sách yêu cầu trả hàng
-- `POST /api/return-requests` - Tạo yêu cầu trả hàng
-- `GET /api/return-requests/:id` - Chi tiết yêu cầu
-- `PUT /api/return-requests/:id/status` - Cập nhật trạng thái
-- `PUT /api/return-requests/:id/process` - Xử lý trả hàng
-
-#### ⚠️ Alerts ⭐ NEW
-- `GET /api/alerts/expiry` - Cảnh báo hết hạn
-- `GET /api/alerts/low-stock` - Cảnh báo tồn kho thấp
-- `GET /api/alerts/summary` - Tổng hợp cảnh báo
-
-#### 📈 Dashboard ⭐ NEW
-- `GET /api/dashboard/overview` - Tổng quan hệ thống
-- `GET /api/dashboard/orders` - Thống kê đơn hàng
-- `GET /api/dashboard/production` - Thống kê sản xuất
-- `GET /api/dashboard/inventory` - Thống kê tồn kho
-- `GET /api/dashboard/shipments` - Thống kê giao hàng
-
-#### 🗂️ Master Data
-- `GET /api/master-data/uoms` - Đơn vị tính
-- `GET /api/master-data/categories` - Danh mục
-- `POST /api/master-data/categories` - Tạo danh mục
-- `GET /api/master-data/suppliers` - Nhà cung cấp
-- `POST /api/master-data/suppliers` - Tạo nhà cung cấp
-- `GET /api/master-data/org-units` - Đơn vị tổ chức
-- `POST /api/master-data/org-units` - Tạo đơn vị tổ chức
-- `GET /api/master-data/locations` - Vị trí kho
-- `POST /api/master-data/locations` - Tạo vị trí kho
-- `GET /api/master-data/roles` - Vai trò
-
-### Chi tiết API
-Xem file [TEST_GUIDE.md](./TEST_GUIDE.md) để biết chi tiết về cách sử dụng từng API endpoint.
+### API Details
+Vui lòng truy cập [Swagger UI](http://localhost:5001/api-docs) để xem chi tiết tham số và test trực tiếp các endpoint.
 
 ---
 
@@ -386,113 +217,17 @@ BE/
 └── package.json         # Dependencies và scripts
 ```
 
-## API Endpoints
+## 🔐 Roles & Permissions
 
-### Health Check
-- `GET /health` - Kiểm tra trạng thái server
+Hệ thống sử dụng Role-Based Access Control (RBAC) với các vai trò chính:
 
-### Authentication
-- `POST /api/auth/register` - Đăng ký user mới (Admin only)
-- `POST /api/auth/login` - Đăng nhập
-- `GET /api/auth/me` - Lấy thông tin user hiện tại (Private)
-
-### Users
-- `GET /api/users` - Lấy danh sách users (Admin/Manager)
-- `GET /api/users/:id` - Lấy user theo ID (Private)
-- `PUT /api/users/:id` - Cập nhật user (Private)
-- `DELETE /api/users/:id` - Xóa user (Admin)
-
-### Items
-- `GET /api/items` - Lấy danh sách items (Private)
-- `GET /api/items/:id` - Lấy item theo ID (Private)
-- `POST /api/items` - Tạo item mới (Manager/Admin)
-- `PUT /api/items/:id` - Cập nhật item (Manager/Admin)
-- `DELETE /api/items/:id` - Xóa item (Admin)
-
-### Internal Orders
-- `GET /api/internal-orders` - Lấy danh sách đơn hàng nội bộ (Private)
-- `GET /api/internal-orders/:id` - Lấy đơn hàng theo ID (Private)
-- `POST /api/internal-orders` - Tạo đơn hàng mới (Store Staff/Manager/Admin)
-- `PUT /api/internal-orders/:id/status` - Cập nhật trạng thái đơn hàng (Private)
-- `POST /api/internal-orders/:id/lines` - Thêm dòng vào đơn hàng (Private)
-
-### Production Orders
-- `GET /api/production-orders` - Lấy danh sách lệnh sản xuất (Private)
-- `GET /api/production-orders/:id` - Lấy lệnh sản xuất theo ID (Private)
-- `POST /api/production-orders` - Tạo lệnh sản xuất mới (Chef/Manager/Admin)
-- `PUT /api/production-orders/:id/status` - Cập nhật trạng thái lệnh sản xuất (Chef/Manager/Admin)
-- `POST /api/production-orders/:id/consumption` - Ghi nhận tiêu hao nguyên liệu (Chef/Manager/Admin)
-- `POST /api/production-orders/:id/output` - Ghi nhận sản phẩm đầu ra (Chef/Manager/Admin)
-
-### Shipments
-- `GET /api/shipments` - Lấy danh sách lô hàng (Private)
-- `GET /api/shipments/:id` - Lấy lô hàng theo ID (Private)
-- `POST /api/shipments` - Tạo lô hàng mới (Chef/Manager/Admin)
-- `PUT /api/shipments/:id/status` - Cập nhật trạng thái lô hàng (Private)
-
-### Goods Receipts
-- `GET /api/goods-receipts` - Lấy danh sách phiếu nhận hàng (Private)
-- `GET /api/goods-receipts/:id` - Lấy phiếu nhận hàng theo ID (Private)
-- `POST /api/goods-receipts` - Tạo phiếu nhận hàng mới (Store Staff/Manager/Admin)
-- `PUT /api/goods-receipts/:id/confirm` - Xác nhận phiếu nhận hàng và cập nhật tồn kho (Store Staff/Manager/Admin)
-
-### Inventory
-- `GET /api/inventory/balances` - Lấy số dư tồn kho (Private)
-- `GET /api/inventory/transactions` - Lấy lịch sử giao dịch tồn kho (Private)
-- `GET /api/inventory/summary` - Lấy tổng hợp tồn kho (Private)
-- `POST /api/inventory/adjust` - Điều chỉnh tồn kho (Manager/Admin)
-
-### Recipes
-- `GET /api/recipes` - Lấy danh sách công thức (Private)
-- `GET /api/recipes/:id` - Lấy công thức theo ID (Private)
-- `POST /api/recipes` - Tạo công thức mới (Manager/Admin)
-- `PUT /api/recipes/:id` - Cập nhật công thức (Manager/Admin)
-- `POST /api/recipes/:id/lines` - Thêm dòng vào công thức (Manager/Admin)
-- `DELETE /api/recipes/:id/lines/:lineId` - Xóa dòng công thức (Manager/Admin)
-
-### Lots
-- `GET /api/lots` - Lấy danh sách lô hàng (Private)
-- `GET /api/lots/:id` - Lấy lô hàng theo ID (Private)
-- `POST /api/lots` - Tạo lô hàng mới (Chef/Manager/Admin)
-- `PUT /api/lots/:id` - Cập nhật lô hàng (Chef/Manager/Admin)
-
-### Master Data
-- `GET /api/master-data/uoms` - Lấy danh sách đơn vị tính (Private)
-- `GET /api/master-data/categories` - Lấy danh sách danh mục (Private)
-- `POST /api/master-data/categories` - Tạo danh mục mới (Manager/Admin)
-- `GET /api/master-data/suppliers` - Lấy danh sách nhà cung cấp (Private)
-- `POST /api/master-data/suppliers` - Tạo nhà cung cấp mới (Manager/Admin)
-- `GET /api/master-data/org-units` - Lấy danh sách đơn vị tổ chức (Private)
-- `POST /api/master-data/org-units` - Tạo đơn vị tổ chức mới (Admin)
-- `GET /api/master-data/locations` - Lấy danh sách vị trí kho (Private)
-- `POST /api/master-data/locations` - Tạo vị trí kho mới (Manager/Admin)
-- `GET /api/master-data/roles` - Lấy danh sách vai trò (Private)
-
-## Technologies
-
-- **Node.js** - Runtime environment
-- **Express** - Web framework
-- **MongoDB** - Database
-- **Mongoose** - ODM
-- **JWT** - Authentication
-- **Bcrypt** - Password hashing
-- **Helmet** - Security headers
-- **Morgan** - HTTP request logger
-- **CORS** - Cross-Origin Resource Sharing
-
-## Development
-
-- Code được tổ chức theo pattern MVC
-- Sử dụng async/await cho xử lý bất đồng bộ
-- Error handling tập trung
-- Validation với express-validator
-- JWT authentication middleware
-
-## Notes
-
-- Các controller hiện tại chỉ là template, cần implement logic cụ thể
-- Cần kết nối database trước khi sử dụng các tính năng CRUD
-- Nhớ thay đổi JWT_SECRET trong production
+| Role | Responsibility |
+| :--- | :--- |
+| **ADMIN** | Quản lý toàn bộ hệ thống, User và Org Units |
+| **MANAGER** | Quản lý Master Data, Inventory, Approval |
+| **CHEF** | Quản lý Recipe, Production Paper, Shipment |
+| **STORE_STAFF** | Tạo Order, Nhận hàng (Goods Receipt), Trả hàng |
+| **SUPPLY_COORDINATOR** | Điều hành Logistics và Xử lý sự cố |
 
 ## 🏗️ Kiến trúc hệ thống
 
@@ -845,10 +580,8 @@ npm run schema:export
 
 ## 🐛 Known Issues
 
-1. **Validation chưa áp dụng đầy đủ** - Cần thêm validation middleware vào tất cả routes
-2. **Chưa có automated tests** - Cần implement unit và integration tests
-3. **Chưa có API documentation (Swagger)** - Cần generate OpenAPI specs
-4. **Performance chưa optimize** - Cần thêm indexing và caching
+1. **Unit Tests** - Cần bổ sung độ phủ test cho các module nghiệp vụ mới
+2. **Performance** - Cần tối ưu hóa Indexing cho các query Dashboard phức tạp
 
 ---
 
@@ -911,12 +644,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Dashboard
 - [x] Validation rules
 
-### Phase 2 (Q2 2024)
-- [ ] Automated testing suite
-- [ ] API documentation (Swagger)
-- [ ] Performance optimization
-- [ ] Caching layer (Redis)
-- [ ] Rate limiting
+### Phase 2 (Q1 2026) 🏗️
+- [x] API documentation (Swagger UI) - **DONE**
+- [x] Real-time updates (Socket.io) - **DONE**
+- [ ] Automated testing suite (Coverage > 80%)
+- [ ] Performance optimization (Indexing & Redis)
+- [ ] Rate limiting & Security Hardening
 
 ### Phase 3 (Q3 2024)
 - [ ] Notification system (Email/Push)

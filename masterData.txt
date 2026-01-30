@@ -340,3 +340,228 @@ db.inventory_transaction.insertMany([
 ]);
 
 print(">>> SUCCESS: Database Created Successfully!");
+// ==========================================
+// 8. SUPPLY COORDINATOR FEATURES (NEW)
+// ==========================================
+
+// 8.1 Delivery Routes (Tuyến giao hàng)
+db.delivery_route.insertMany([
+  { 
+    _id: "route_001", 
+    route_no: "DR-2024-001", 
+    route_name: "Tuyến Q1-Q3-Q7",
+    driver_name: "Nguyễn Văn Tài",
+    driver_phone: "0912345678",
+    vehicle_no: "51H-12345",
+    vehicle_type: "TRUCK_1TON",
+    planned_date: new Date("2024-01-20"),
+    status: "PLANNED", // PLANNED, IN_PROGRESS, COMPLETED, CANCELLED
+    total_distance_km: 25.5,
+    estimated_duration_mins: 120,
+    actual_start_time: null,
+    actual_end_time: null,
+    created_by: "user_coordinator",
+    created_at: new Date()
+  },
+  { 
+    _id: "route_002", 
+    route_no: "DR-2024-002", 
+    route_name: "Tuyến Q1-Q2",
+    driver_name: "Trần Văn Bình",
+    driver_phone: "0923456789",
+    vehicle_no: "51H-67890",
+    vehicle_type: "TRUCK_500KG",
+    planned_date: new Date("2024-01-21"),
+    status: "PLANNED",
+    total_distance_km: 12.3,
+    estimated_duration_mins: 60,
+    actual_start_time: null,
+    actual_end_time: null,
+    created_by: "user_coordinator",
+    created_at: new Date()
+  }
+]);
+
+// 8.2 Route Stops (Điểm dừng trên tuyến)
+db.route_stop.insertMany([
+  {
+    _id: "stop_001",
+    route_id: "route_001",
+    sequence: 1,
+    store_org_unit_id: "org_store_q1",
+    shipment_ids: ["ship_001"],
+    estimated_arrival: new Date("2024-01-20T09:00:00"),
+    estimated_departure: new Date("2024-01-20T09:30:00"),
+    actual_arrival: null,
+    actual_departure: null,
+    status: "PENDING", // PENDING, ARRIVED, COMPLETED, SKIPPED
+    notes: "Giao hàng tại cửa sau"
+  },
+  {
+    _id: "stop_002",
+    route_id: "route_001",
+    sequence: 2,
+    store_org_unit_id: "org_store_q3",
+    shipment_ids: [],
+    estimated_arrival: new Date("2024-01-20T10:00:00"),
+    estimated_departure: new Date("2024-01-20T10:30:00"),
+    actual_arrival: null,
+    actual_departure: null,
+    status: "PENDING",
+    notes: "Liên hệ trước 15 phút"
+  }
+]);
+
+// 8.3 Consolidated Order Summary (Tổng hợp đơn hàng)
+// View này giúp Supply Coordinator xem tổng hợp nhu cầu từ tất cả cửa hàng
+db.consolidated_order_summary.insertMany([
+  {
+    _id: "cons_001",
+    consolidation_date: new Date("2024-01-19"),
+    delivery_date: new Date("2024-01-20"),
+    item_id: "item_sauce_bol",
+    total_qty_ordered: 50, // Tổng từ tất cả cửa hàng
+    uom_id: "uom_pack",
+    stores: [
+      { store_id: "org_store_q1", qty: 20, order_id: "ord_001" },
+      { store_id: "org_store_q3", qty: 30, order_id: "ord_002" }
+    ],
+    production_status: "SUFFICIENT", // SUFFICIENT, NEED_PRODUCTION, PARTIAL
+    available_inventory: 50,
+    need_to_produce: 0,
+    created_by: "user_coordinator",
+    created_at: new Date()
+  },
+  {
+    _id: "cons_002",
+    consolidation_date: new Date("2024-01-19"),
+    delivery_date: new Date("2024-01-20"),
+    item_id: "item_beef",
+    total_qty_ordered: 100,
+    uom_id: "uom_kg",
+    stores: [
+      { store_id: "org_store_q1", qty: 50, order_id: "ord_003" },
+      { store_id: "org_store_q3", qty: 50, order_id: "ord_004" }
+    ],
+    production_status: "NEED_PRODUCTION",
+    available_inventory: 80,
+    need_to_produce: 20,
+    created_by: "user_coordinator",
+    created_at: new Date()
+  }
+]);
+
+// 8.4 Delivery Schedule (Lịch giao hàng)
+db.delivery_schedule.insertMany([
+  {
+    _id: "sched_001",
+    schedule_no: "DS-2024-W03",
+    week_start: new Date("2024-01-15"),
+    week_end: new Date("2024-01-21"),
+    status: "ACTIVE", // DRAFT, ACTIVE, COMPLETED
+    schedules: [
+      {
+        day_of_week: "MONDAY",
+        date: new Date("2024-01-15"),
+        routes: ["route_001"],
+        total_shipments: 5,
+        total_stores: 3
+      },
+      {
+        day_of_week: "WEDNESDAY",
+        date: new Date("2024-01-17"),
+        routes: ["route_002"],
+        total_shipments: 3,
+        total_stores: 2
+      },
+      {
+        day_of_week: "FRIDAY",
+        date: new Date("2024-01-19"),
+        routes: [],
+        total_shipments: 0,
+        total_stores: 0
+      }
+    ],
+    created_by: "user_coordinator",
+    created_at: new Date()
+  }
+]);
+
+// 8.5 Exception Log (Nhật ký xử lý sự cố)
+db.exception_log.insertMany([
+  {
+    _id: "exc_001",
+    exception_type: "OUT_OF_STOCK", // OUT_OF_STOCK, LATE_DELIVERY, WRONG_ITEM, QUALITY_ISSUE, CANCELLED
+    severity: "HIGH", // LOW, MEDIUM, HIGH, CRITICAL
+    order_id: "ord_001",
+    item_id: "item_sauce_bol",
+    store_org_unit_id: "org_store_q1",
+    description: "Thiếu 5 pack sốt Bolognese do sản xuất chậm",
+    reported_by: "user_coordinator",
+    reported_at: new Date("2024-01-19T14:30:00"),
+    status: "RESOLVED", // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+    resolution: "Đã lên kế hoạch sản xuất bổ sung, giao hàng vào ngày mai",
+    resolved_by: "user_coordinator",
+    resolved_at: new Date("2024-01-19T16:00:00")
+  },
+  {
+    _id: "exc_002",
+    exception_type: "LATE_DELIVERY",
+    severity: "MEDIUM",
+    order_id: "ord_002",
+    item_id: null,
+    store_org_unit_id: "org_store_q3",
+    description: "Xe giao hàng bị kẹt xe, trễ 30 phút",
+    reported_by: "user_coordinator",
+    reported_at: new Date("2024-01-20T09:45:00"),
+    status: "IN_PROGRESS",
+    resolution: null,
+    resolved_by: null,
+    resolved_at: null
+  }
+]);
+
+// 8.6 Performance Metrics (Chỉ số hiệu suất)
+db.performance_metrics.insertMany([
+  {
+    _id: "perf_001",
+    metric_date: new Date("2024-01-20"),
+    metric_type: "DELIVERY_PERFORMANCE",
+    metrics: {
+      total_deliveries: 10,
+      on_time_deliveries: 9,
+      late_deliveries: 1,
+      on_time_rate: 0.90,
+      average_delay_mins: 15
+    },
+    created_at: new Date()
+  },
+  {
+    _id: "perf_002",
+    metric_date: new Date("2024-01-20"),
+    metric_type: "ORDER_FULFILLMENT",
+    metrics: {
+      total_orders: 15,
+      fully_fulfilled: 13,
+      partially_fulfilled: 2,
+      fulfillment_rate: 0.867,
+      average_fulfillment_time_hours: 24
+    },
+    created_at: new Date()
+  },
+  {
+    _id: "perf_003",
+    metric_date: new Date("2024-01-20"),
+    metric_type: "EXCEPTION_HANDLING",
+    metrics: {
+      total_exceptions: 5,
+      resolved_exceptions: 4,
+      open_exceptions: 1,
+      average_resolution_time_hours: 2.5,
+      critical_exceptions: 0
+    },
+    created_at: new Date()
+  }
+]);
+
+print(">>> SUCCESS: Database Created Successfully with Supply Coordinator Features!");

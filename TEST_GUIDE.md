@@ -1,45 +1,35 @@
 # 🧪 HƯỚNG DẪN TEST API - Central Kitchen Management System
 
-> Hướng dẫn chi tiết test tất cả API endpoints với Postman
+> Hướng dẫn chi tiết test tất cả API endpoints qua Swagger UI (Khuyến nghị) và Postman
 
 ## 📋 Mục lục
 
-1. [Chuẩn bị](#chuẩn-bị)
+1. [Chuẩn bị & Swagger UI](#chuẩn-bị--swagger-ui)
 2. [Authentication](#1-authentication)
-3. [Master Data](#2-master-data)
-4. [Items](#3-items)
-5. [Recipes](#4-recipes)
-6. [Lots](#5-lots)
-7. [Internal Orders](#6-internal-orders)
-8. [Production Orders](#7-production-orders)
-9. [Shipments](#8-shipments)
-10. [Goods Receipts](#9-goods-receipts)
-11. [Inventory](#10-inventory)
-12. [Return Requests](#11-return-requests)
-13. [Alerts](#12-alerts)
-14. [Dashboard](#13-dashboard)
+...
 15. [Users](#14-users)
+16. [Consolidated Orders](#15-consolidated-orders) ⭐ NEW
+17. [Exceptions (Ghi nhận sự cố)](#16-exceptions) ⭐ NEW
+18. [Performance Metrics](#17-performance-metrics) ⭐ NEW
+19. [Notifications (Thông báo)](#18-notifications) ⭐ NEW
 
 ---
 
-## Chuẩn bị
+## Chuẩn bị & Swagger UI
 
-### Base URL
-```
-http://localhost:5000/api
-```
+### 🚀 Swagger UI (Ưu tiên)
+Đây là cách test nhanh và trực quan nhất.
+1. **URL:** `http://localhost:5001/api-docs`
+2. **Authorize:** 
+   - Sau khi thực hiện `POST /auth/login`, copy `token` từ response.
+   - Click nút **"Authorize"** ở trên cùng bên phải.
+   - Nhập: `Bearer <token_của_bạn>`
+   - Nhấn **Authorize** rồi **Close**.
 
-### Environment Variables trong Postman
-Tạo environment mới với các biến:
-- `base_url`: `http://localhost:5000/api`
-- `token`: (sẽ được set sau khi login)
-
-### Headers mặc định
-Tất cả request (trừ login/register) cần header:
-```
-Authorization: Bearer {{token}}
-Content-Type: application/json
-```
+### Postman (Tùy chọn)
+- **Base URL:** `http://localhost:5001/api`
+- **Environment:** Tạo biến `base_url` và `token`.
+- **Headers:** `Authorization: Bearer {{token}}`
 
 ---
 
@@ -2172,6 +2162,64 @@ GET /dashboard/orders?start_date=2024-01-01&end_date=2024-01-31&group_by=week
 
 ---
 
+## 15. Consolidated Orders ⭐ NEW
+
+Dùng để gom đơn từ các cửa hàng để lên kế hoạch sản xuất.
+
+### 15.1 Generate Consolidation
+**POST** `/consolidated-orders/generate`
+- **Body:** `{ "delivery_date": "2024-01-20" }`
+- **Use Case:** Kitchen Manager chạy lệnh này để biết tổng lượng cần sản xuất cho ngày mai.
+
+### 15.2 Get Consolidated Orders
+**GET** `/consolidated-orders`
+- **Query:** `delivery_date=2024-01-20`
+
+---
+
+## 16. Exceptions (Ghi nhận sự cố) ⭐ NEW
+
+### 16.1 Report Exception
+**POST** `/exceptions`
+- **Body:**
+```json
+{
+  "exception_type": "DAMAGE",
+  "severity": "HIGH",
+  "description": "Bể 5 túi sốt khi vận chuyển",
+  "store_org_unit_id": "org_store_q1",
+  "order_id": "ord_123"
+}
+```
+
+### 16.2 Resolve Exception
+**PUT** `/exceptions/:id/resolve`
+- **Body:** `{ "resolution": "Đã gửi bù hàng trong chuyến xe tiếp theo" }`
+
+---
+
+## 17. Performance Metrics ⭐ NEW
+
+Dành cho Strategic Manager theo dõi hiệu quả.
+
+### 17.1 Production Efficiency
+**GET** `/performance-metrics/production-efficiency`
+
+### 17.2 Store Order Accuracy
+**GET** `/performance-metrics/store-order-accuracy`
+
+---
+
+## 18. Notifications (Thông báo) ⭐ NEW
+
+### 18.1 Get My Notifications
+**GET** `/notifications`
+
+### 18.2 Mark as Read
+**PUT** `/notifications/:id/read`
+
+---
+
 ## 📝 Common Response Codes
 
 ### Success Codes
@@ -2321,77 +2369,17 @@ Body: { process_date: "2024-01-17" }
 
 ## 🧪 Testing Tips
 
-### 1. Setup Environment
+### 1. Swagger UI (Khuyến nghị)
+- Tận dụng tính năng **Try it out** để gửi request trực tiếp trên browser.
+- Luôn Authorize trước khi test các endpoint bảo mật.
+- Schema mẫu được hiển thị sẵn, chỉ cần sửa data phù hợp.
+
+### 2. Setup Environment (Postman)
 - Tạo Postman environment với `base_url` và `token`
 - Import tất cả requests vào collection
 - Organize theo folders (Auth, Orders, Production, etc.)
 
-### 2. Test Flow
-- Luôn test login trước để lấy token
-- Test theo workflow thực tế (tạo order → ship → receive)
-- Kiểm tra inventory sau mỗi transaction
-
-### 3. Common Test Cases
-- **Happy Path**: Test flow bình thường
-- **Validation**: Test với dữ liệu không hợp lệ
-- **Authorization**: Test với user không có quyền
-- **Edge Cases**: Test với số lượng = 0, ngày hết hạn, etc.
-
-### 4. Data Verification
-- Sau khi tạo order, check inventory balance
-- Sau khi ship, check fulfillment status
-- Sau khi receive, verify inventory transaction
-
-### 5. Postman Scripts
-
-**Pre-request Script (Set token):**
-```javascript
-pm.request.headers.add({
-  key: 'Authorization',
-  value: 'Bearer ' + pm.environment.get('token')
-});
-```
-
-**Test Script (Save token after login):**
-```javascript
-if (pm.response.code === 200) {
-  var jsonData = pm.response.json();
-  pm.environment.set('token', jsonData.data.token);
-}
-```
-
-**Test Script (Verify response):**
-```javascript
-pm.test("Status code is 200", function () {
-  pm.response.to.have.status(200);
-});
-
-pm.test("Response has success field", function () {
-  var jsonData = pm.response.json();
-  pm.expect(jsonData.success).to.eql(true);
-});
-```
-
 ---
 
-## 📚 Additional Resources
-
-### Sample Data
-Xem file `masterData.txt` để có dữ liệu mẫu đầy đủ
-
-### API Documentation
-- README.md: Tổng quan hệ thống
-- Source code: `/src/routes/` và `/src/controllers/`
-
-### Support
-- GitHub Issues: Report bugs
-- Email: support@example.com
-
----
-
-**Last Updated:** January 18, 2024
-**Version:** 1.1.0
-
----
-
-**Happy Testing! 🚀**
+**Last Updated:** January 29, 2026
+**Version:** 1.2.0

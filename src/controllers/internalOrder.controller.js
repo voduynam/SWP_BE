@@ -16,7 +16,7 @@ exports.getInternalOrders = asyncHandler(async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
   if (store_org_unit_id) filter.store_org_unit_id = store_org_unit_id;
-  
+
   // Filter by user's org unit if not admin/manager
   if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
     filter.store_org_unit_id = req.user.org_unit_id;
@@ -95,7 +95,7 @@ exports.getInternalOrder = asyncHandler(async (req, res) => {
 // @route   POST /api/internal-orders
 // @access  Private (Store Staff, Manager, Admin)
 exports.createInternalOrder = asyncHandler(async (req, res) => {
-  const { store_org_unit_id, order_date, lines } = req.body;
+  const { store_org_unit_id, order_date, lines, is_urgent } = req.body;
 
   if (!lines || lines.length === 0) {
     return res.status(400).json(
@@ -122,7 +122,8 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     status: 'DRAFT',
     created_by: req.user.id,
     total_amount: totalAmount,
-    currency: 'VND'
+    currency: 'VND',
+    is_urgent: is_urgent || false
   });
 
   // Create order lines
@@ -159,6 +160,38 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
   const populatedOrder = await InternalOrder.findById(order._id)
     .populate('store_org_unit_id', 'name code type')
     .populate('created_by', 'username full_name');
+
+  // --- [NOTIFICATION TRIGGER] ---
+  const notificationController = require('./notification.controller');
+  if (order.is_urgent) {
+    await notificationController.createNotificationInternal({
+      recipient_role: 'SUPPLY_COORDINATOR',
+      title: 'DƠN HÀNG KHẨN CẤP!',
+      message: `Cửa hàng ${populatedOrder.store_org_unit_id.name} vừa tạo một đơn hàng khẩn cấp: ${order.order_no}`,
+      type: 'URGENT',
+      ref_type: 'ORDER',
+      ref_id: order._id
+    });
+
+    // Also notify Manager for urgent orders
+    await notificationController.createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Cảnh báo: Đơn hàng khẩn',
+      message: `Đơn hàng khẩn cấp ${order.order_no} cần được xử lý ngay.`,
+      type: 'URGENT',
+      ref_type: 'ORDER',
+      ref_id: order._id
+    });
+  } else {
+    await notificationController.createNotificationInternal({
+      recipient_role: 'SUPPLY_COORDINATOR',
+      title: 'Đơn hàng mới',
+      message: `Có đơn hàng mới ${order.order_no} từ ${populatedOrder.store_org_unit_id.name}`,
+      type: 'INFO',
+      ref_type: 'ORDER',
+      ref_id: order._id
+    });
+  }
 
   return res.status(201).json(
     ApiResponse.success({
@@ -202,6 +235,20 @@ exports.updateOrderStatus = asyncHandler(async (req, res) => {
   const populatedOrder = await InternalOrder.findById(order._id)
     .populate('store_org_unit_id', 'name code type')
     .populate('created_by', 'username full_name');
+
+  // --- [NOTIFICATION TRIGGER] ---
+  if (status === 'SHIPPED') {
+    const notificationController = require('./notification.controller');
+    await notificationController.createNotificationInternal({
+      recipient_role: 'STORE_STAFF',
+      recipient_id: order.created_by, // Notify the specific person who created the order
+      title: 'Hàng đang trên đường giao',
+      message: `Đơn hàng ${order.order_no} đã được xuất kho và đang được chuyển đến bạn.`,
+      type: 'SUCCESS',
+      ref_type: 'ORDER',
+      ref_id: order._id
+    });
+  }
 
   return res.status(200).json(
     ApiResponse.success(populatedOrder, 'Order status updated successfully')
