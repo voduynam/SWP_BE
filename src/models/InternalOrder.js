@@ -42,6 +42,16 @@ const internalOrderSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  payment_id: {
+    type: String,
+    default: null,
+    ref: 'Payment'
+  },
+  payment_status: {
+    type: String,
+    enum: ['UNPAID', 'PAID', 'FAILED', 'CANCELLED'],
+    default: 'UNPAID'
+  },
   created_at: {
     type: Date,
     default: Date.now

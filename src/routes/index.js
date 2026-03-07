@@ -21,6 +21,7 @@ const consolidatedOrderRoutes = require('./consolidatedOrder.routes');
 const exceptionRoutes = require('./exception.routes');
 const performanceMetricsRoutes = require('./performanceMetrics.routes');
 const notificationRoutes = require('./notification.routes');
+const paymentRoutes = require('./payment.routes');
 
 // Define routes
 router.use('/auth', authRoutes);
@@ -42,6 +43,7 @@ router.use('/consolidated-orders', consolidatedOrderRoutes);
 router.use('/exceptions', exceptionRoutes);
 router.use('/performance-metrics', performanceMetricsRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/payments', paymentRoutes);
 
 // Default route
 router.get('/', (req, res) => {
@@ -66,7 +68,8 @@ router.get('/', (req, res) => {
       'delivery-routes': '/api/delivery-routes',
       'consolidated-orders': '/api/consolidated-orders',
       exceptions: '/api/exceptions',
-      'performance-metrics': '/api/performance-metrics'
+      'performance-metrics': '/api/performance-metrics',
+      payments: '/api/payments'
     }
   });
 });
