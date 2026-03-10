@@ -47,6 +47,14 @@ const routeStopSchema = new mongoose.Schema({
     notes: {
         type: String,
         default: ''
+    },
+    delivery_photo_url: {
+        type: String,
+        default: null
+    },
+    delivery_photo_uploaded_at: {
+        type: Date,
+        default: null
     }
 }, {
     _id: false,

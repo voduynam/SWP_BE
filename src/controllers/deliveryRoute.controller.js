@@ -1,6 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const DeliveryRoute = require('../models/DeliveryRoute');
 const RouteStop = require('../models/RouteStop');
+const AppUser = require('../models/AppUser');
 const ApiResponse = require('../utils/ApiResponse');
 
 // @desc    Get all delivery routes
@@ -65,14 +66,31 @@ exports.getDeliveryRoute = asyncHandler(async (req, res) => {
 exports.createDeliveryRoute = asyncHandler(async (req, res) => {
     const {
         route_name,
-        driver_name,
-        driver_phone,
+        driver_id,
         vehicle_no,
         vehicle_type,
         planned_date,
         total_distance_km,
         estimated_duration_mins
     } = req.body;
+
+    // Get driver info from driver_id
+    let driver_name = '';
+    let driver_phone = '';
+    if (driver_id) {
+        const driver = await AppUser.findById(driver_id);
+        if (!driver) {
+            return res.status(404).json(
+                ApiResponse.error('Driver not found', 404)
+            );
+        }
+        driver_name = driver.full_name;
+        driver_phone = driver.phone || '';
+    } else {
+        return res.status(400).json(
+            ApiResponse.error('driver_id is required', 400)
+        );
+    }
 
     // Generate route number
     const routeCount = await DeliveryRoute.countDocuments();
@@ -231,6 +249,55 @@ exports.addRouteStop = asyncHandler(async (req, res) => {
     );
 });
 
+// @desc    Get my delivery routes (for drivers)
+// @route   GET /api/delivery-routes/my-routes/list
+// @access  Private (Driver)
+exports.getMyRoutes = asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Get current user
+    const user = await AppUser.findById(req.user.id);
+    if (!user) {
+        return res.status(404).json(
+            ApiResponse.error('User not found', 404)
+        );
+    }
+
+    // Filter by driver name (current user)
+    const { status } = req.query;
+    const filter = { driver_name: user.full_name };
+    if (status) filter.status = status;
+
+    // Get routes assigned to this driver
+    const routes = await DeliveryRoute.find(filter)
+        .skip(skip)
+        .limit(limit)
+        .sort({ planned_date: -1 });
+
+    // Get stops for each route
+    const routesWithStops = await Promise.all(
+        routes.map(async (route) => {
+            const stops = await RouteStop.find({ route_id: route._id })
+                .populate('store_org_unit_id', 'name code address')
+                .populate('shipment_ids', 'shipment_no status')
+                .sort({ sequence: 1 });
+            
+            return {
+                ...route.toObject(),
+                stops
+            };
+        })
+    );
+
+    const total = await DeliveryRoute.countDocuments(filter);
+
+    return res.status(200).json(
+        ApiResponse.paginate(routesWithStops, page, limit, total)
+    );
+});
+
 // @desc    Update stop status
 // @route   PUT /api/delivery-routes/:id/stops/:stopId/status
 // @access  Private (Supply Coordinator, Manager, Admin)
@@ -241,6 +308,20 @@ exports.updateStopStatus = asyncHandler(async (req, res) => {
     if (!validStatuses.includes(status)) {
         return res.status(400).json(
             ApiResponse.error('Invalid status', 400)
+        );
+    }
+
+    // Check route exists & status = IN_PROGRESS
+    const route = await DeliveryRoute.findById(req.params.id);
+    if (!route) {
+        return res.status(404).json(
+            ApiResponse.error('Delivery route not found', 404)
+        );
+    }
+
+    if (route.status !== 'IN_PROGRESS') {
+        return res.status(400).json(
+            ApiResponse.error('Route must be IN_PROGRESS to update stop status', 400)
         );
     }
 
@@ -258,6 +339,14 @@ exports.updateStopStatus = asyncHandler(async (req, res) => {
         );
     }
 
+    // Check workflow order: PENDING → ARRIVED → COMPLETED → SKIPPED
+    const statusOrder = { 'PENDING': 0, 'ARRIVED': 1, 'COMPLETED': 2, 'SKIPPED': 2 };
+    if (statusOrder[status] <= statusOrder[stop.status] && stop.status !== 'PENDING') {
+        return res.status(400).json(
+            ApiResponse.error(`Cannot transition from ${stop.status} to ${status}. Valid: PENDING→ARRIVED→COMPLETED|SKIPPED`, 400)
+        );
+    }
+
     stop.status = status;
 
     // Set actual times based on status
@@ -266,6 +355,12 @@ exports.updateStopStatus = asyncHandler(async (req, res) => {
     }
     if (status === 'COMPLETED' && !stop.actual_departure) {
         stop.actual_departure = new Date();
+    }
+
+    // Handle delivery photo upload
+    if (status === 'COMPLETED' && req.file) {
+        stop.delivery_photo_url = req.file.path;
+        stop.delivery_photo_uploaded_at = new Date();
     }
 
     await stop.save();

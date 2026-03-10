@@ -7,7 +7,7 @@ const notificationSchema = new mongoose.Schema({
     },
     recipient_role: {
         type: String,
-        enum: ['ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'CHEF', 'STORE_STAFF'],
+        enum: ['ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'CHEF', 'STORE_STAFF', 'DRIVER'],
         required: true
     },
     recipient_id: {
@@ -30,7 +30,7 @@ const notificationSchema = new mongoose.Schema({
     },
     ref_type: {
         type: String,
-        enum: ['ORDER', 'SHIPMENT', 'PRODUCTION', 'EXCEPTION', 'OTHER'],
+        enum: ['ORDER', 'SHIPMENT', 'PRODUCTION', 'EXCEPTION', 'DELIVERY_ROUTE', 'ROUTE_STOP', 'OTHER'],
         default: 'OTHER'
     },
     ref_id: {

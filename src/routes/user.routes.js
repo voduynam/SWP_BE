@@ -87,6 +87,33 @@ router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
 
 /**
  * @swagger
+ * /api/users/drivers/list:
+ *   get:
+ *     summary: Get all drivers
+ *     tags: [Users]
+ *     description: Retrieve paginated list of all active users with DRIVER role
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: List of drivers
+ */
+// @route   GET /api/users/drivers/list
+// @desc    Get all drivers
+// @access  Private
+router.get('/drivers/list', userController.getDrivers);
+
+/**
+ * @swagger
  * /api/users/{id}:
  *   get:
  *     summary: Get user by ID

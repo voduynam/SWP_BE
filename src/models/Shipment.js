@@ -34,6 +34,14 @@ const shipmentSchema = new mongoose.Schema({
     enum: ['DRAFT', 'PICKED', 'SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED'],
     default: 'DRAFT'
   },
+  delivery_photo_url: {
+    type: String,
+    default: null
+  },
+  delivery_photo_uploaded_at: {
+    type: Date,
+    default: null
+  },
   created_by: {
     type: String,
     required: true,

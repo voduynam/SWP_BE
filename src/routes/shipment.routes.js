@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const shipmentController = require('../controllers/shipment.controller');
 const { protect, authorize } = require('../middlewares/auth');
+const upload = require('../middlewares/uploadDeliveryImage');
 
 /**
  * @swagger
@@ -123,8 +124,13 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.creat
  * @swagger
  * /api/shipments/{id}/status:
  *   put:
- *     summary: Update shipment status
+ *     summary: Update shipment status + Upload delivery photo (when DELIVERED)
  *     tags: [Shipments]
+ *     description: |
+ *       Cập nhật status của shipment.
+ *       
+ *       Khi status=DELIVERED, có thể upload ảnh chứng minh giao hàng.
+ *       Ảnh sẽ tự động upload lên Cloudinary.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -133,21 +139,63 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.creat
  *         required: true
  *         schema:
  *           type: string
+ *         description: "Shipment ID"
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - status
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [DRAFT, PICKED, SHIPPED, IN_TRANSIT, DELIVERED, CANCELLED]
+ *                 enum: ["DRAFT", "PICKED", "SHIPPED", "IN_TRANSIT", "DELIVERED", "CANCELLED"]
+ *                 description: "Status của shipment"
+ *                 example: "DELIVERED"
+ *               delivery_photo:
+ *                 type: string
+ *                 format: binary
+ *                 description: "Ảnh chứng minh giao hàng (khi status=DELIVERED, tùy chọn)"
  *     responses:
  *       200:
- *         description: Status updated
+ *         description: Status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     shipment_no:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       example: "DELIVERED"
+ *                     delivery_photo_url:
+ *                       type: string
+ *                       description: "URL ảnh từ Cloudinary (nếu upload)"
+ *                     delivery_photo_uploaded_at:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Bad request - Invalid status
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Shipment not found
+ *       413:
+ *         description: Payload too large - File quá lớn (max 5MB)
  */
-router.put('/:id/status', shipmentController.updateShipmentStatus);
+router.put('/:id/status', upload.single('delivery_photo'), shipmentController.updateShipmentStatus);
 
 /**
  * @swagger

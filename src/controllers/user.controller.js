@@ -43,6 +43,50 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
   );
 });
 
+// @desc    Get all drivers (users with DRIVER role)
+// @route   GET /api/users/drivers/list
+// @access  Private
+exports.getDrivers = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  // Get DRIVER role ID
+  const driverRole = await Role.findOne({ code: 'DRIVER' });
+  if (!driverRole) {
+    return res.status(404).json(
+      ApiResponse.error('DRIVER role not found', 404)
+    );
+  }
+
+  // Get all users with DRIVER role
+  const userRoles = await UserRole.find({ role_id: driverRole._id })
+    .skip(skip)
+    .limit(limit);
+
+  const userIds = userRoles.map(ur => ur.user_id);
+  
+  // Get user details
+  const drivers = await AppUser.find({ 
+    _id: { $in: userIds },
+    status: 'ACTIVE'
+  })
+    .populate('org_unit_id', 'name code type')
+    .sort({ created_at: -1 });
+
+  // Add role info to drivers
+  const driversWithRoles = drivers.map(driver => ({
+    ...driver.toObject(),
+    role: 'DRIVER'
+  }));
+
+  const total = await UserRole.countDocuments({ role_id: driverRole._id });
+
+  return res.status(200).json(
+    ApiResponse.paginate(driversWithRoles, page, limit, total)
+  );
+});
+
 // @desc    Get user by ID
 // @route   GET /api/users/:id
 // @access  Private

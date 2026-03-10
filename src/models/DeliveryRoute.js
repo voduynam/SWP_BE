@@ -24,7 +24,7 @@ const deliveryRouteSchema = new mongoose.Schema({
     },
     vehicle_no: {
         type: String,
-        required: true
+        default: null
     },
     vehicle_type: {
         type: String,

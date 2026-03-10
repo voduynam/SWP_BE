@@ -191,6 +191,13 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
 
   shipment.status = status;
   shipment.updated_at = new Date();
+
+  // Handle delivery photo upload when status = DELIVERED
+  if (status === 'DELIVERED' && req.file) {
+    shipment.delivery_photo_url = req.file.path;
+    shipment.delivery_photo_uploaded_at = new Date();
+  }
+
   await shipment.save();
 
   const populatedShipment = await Shipment.findById(shipment._id)
