@@ -1,6 +1,8 @@
 const asyncHandler = require('../utils/asyncHandler');
 const Recipe = require('../models/Recipe');
 const RecipeLine = require('../models/RecipeLine');
+const Item = require('../models/Item');
+const UOM = require('../models/UOM');
 const ApiResponse = require('../utils/ApiResponse');
 
 // @desc    Get all recipes
@@ -60,10 +62,45 @@ exports.getRecipe = asyncHandler(async (req, res) => {
 exports.createRecipe = asyncHandler(async (req, res) => {
   const { _id, item_id, version, status, effective_from, effective_to, lines } = req.body;
 
+  // Validate lines
   if (!lines || lines.length === 0) {
     return res.status(400).json(
       ApiResponse.error('Recipe must have at least one line', 400)
     );
+  }
+
+  // ✅ Validate item_id exists
+  const finishedItem = await Item.findById(item_id);
+  if (!finishedItem) {
+    return res.status(404).json(
+      ApiResponse.error(`Item not found with ID: ${item_id}`, 404)
+    );
+  }
+
+  // ✅ Validate all material items exist and all UOMs exist
+  for (const line of lines) {
+    // Check material item exists
+    const materialItem = await Item.findById(line.material_item_id);
+    if (!materialItem) {
+      return res.status(404).json(
+        ApiResponse.error(`Material item not found with ID: ${line.material_item_id}`, 404)
+      );
+    }
+
+    // Check UOM exists
+    const uom = await UOM.findById(line.uom_id);
+    if (!uom) {
+      return res.status(404).json(
+        ApiResponse.error(`UOM not found with ID: ${line.uom_id}`, 404)
+      );
+    }
+
+    // Validate qty_per_batch
+    if (!line.qty_per_batch || line.qty_per_batch <= 0) {
+      return res.status(400).json(
+        ApiResponse.error(`qty_per_batch must be greater than 0 for material: ${line.material_item_id}`, 400)
+      );
+    }
   }
 
   // Check if version already exists for this item
