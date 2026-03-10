@@ -42,6 +42,90 @@ exports.getInternalOrders = asyncHandler(async (req, res) => {
   );
 });
 
+// @desc    Get order with full shipment & delivery history
+// @route   GET /api/internal-orders/:id/history
+// @access  Private
+exports.getOrderHistory = asyncHandler(async (req, res) => {
+  const order = await InternalOrder.findById(req.params.id)
+    .populate('store_org_unit_id', 'name code type')
+    .populate('created_by', 'username full_name');
+
+  if (!order) {
+    return res.status(404).json(
+      ApiResponse.error('Order not found', 404)
+    );
+  }
+
+  // Check access
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+    if (order.store_org_unit_id._id !== req.user.org_unit_id) {
+      return res.status(403).json(
+        ApiResponse.error('Access denied', 403)
+      );
+    }
+  }
+
+  // Get order lines
+  const orderLines = await InternalOrderLine.find({ order_id: order._id })
+    .populate('item_id', 'sku name item_type')
+    .populate('uom_id', 'code name');
+
+  // Get shipments for this order
+  const Shipment = require('../models/Shipment');
+  const shipments = await Shipment.find({ order_id: order._id })
+    .populate('from_location_id', 'name code')
+    .populate('to_location_id', 'name code')
+    .select('_id shipment_no status ship_date delivery_photo_url delivery_photo_uploaded_at');
+
+  // Get delivery routes for each shipment
+  const DeliveryRoute = require('../models/DeliveryRoute');
+  const shipmentsWithRoutes = await Promise.all(
+    shipments.map(async (shipment) => {
+      const route = await DeliveryRoute.findOne({ shipment_ids: { $in: [shipment._id] } })
+        .select('_id route_no status driver_name driver_phone vehicle_no planned_date completed_at delivery_photo_url delivery_photo_uploaded_at')
+        .lean();
+      
+      return {
+        ...shipment.toObject(),
+        delivery_route: route || null
+      };
+    })
+  );
+
+  // Calculate overall status
+  const getOverallStatus = () => {
+    if (shipmentsWithRoutes.length === 0) return 'NO_SHIPMENT';
+    
+    const allDelivered = shipmentsWithRoutes.every(s => s.status === 'DELIVERED');
+    const anyDelivered = shipmentsWithRoutes.some(s => s.status === 'DELIVERED');
+    const anyInTransit = shipmentsWithRoutes.some(s => s.status === 'IN_TRANSIT');
+    
+    if (allDelivered) return 'FULLY_DELIVERED';
+    if (anyDelivered) return 'PARTIALLY_DELIVERED';
+    if (anyInTransit) return 'IN_DELIVERY';
+    
+    const anyPicked = shipmentsWithRoutes.some(s => s.status === 'PICKED');
+    if (anyPicked) return 'READY_TO_SHIP';
+    
+    return 'PENDING';
+  };
+
+  return res.status(200).json(
+    ApiResponse.success({
+      order: order.toObject(),
+      lines: orderLines,
+      shipments: shipmentsWithRoutes,
+      overall_status: getOverallStatus(),
+      summary: {
+        total_shipments: shipmentsWithRoutes.length,
+        delivered: shipmentsWithRoutes.filter(s => s.status === 'DELIVERED').length,
+        in_transit: shipmentsWithRoutes.filter(s => s.status === 'IN_TRANSIT').length,
+        pending: shipmentsWithRoutes.filter(s => ['DRAFT', 'PICKED'].includes(s.status)).length
+      }
+    }, 'Order history with shipment and delivery details')
+  );
+});
+
 // @desc    Get single internal order with lines
 // @route   GET /api/internal-orders/:id
 // @access  Private

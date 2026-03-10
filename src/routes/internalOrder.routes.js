@@ -96,6 +96,35 @@ router.get('/:id', internalOrderController.getInternalOrder);
 
 /**
  * @swagger
+ * /api/internal-orders/{id}/history:
+ *   get:
+ *     summary: Get complete order history (Order → Shipment → Delivery)
+ *     tags: [Internal Orders]
+ *     description: |
+ *       Xem lịch sử đầy đủ của đơn hàng từ lúc tạo cho đến khi giao.
+ *       
+ *       Bao gồm:
+ *       - Chi tiết đơn hàng và các mặt hàng
+ *       - Danh sách shipments (trạng thái, ảnh giao hàng)
+ *       - Thông tin delivery route (tài xế, xe, trạng thái)
+ *       - Tổng hợp trạng thái giao hàng
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: "Order ID"
+ *     responses:
+ *       200:
+ *         description: Complete order history with shipment and delivery details
+ */
+router.get('/:id/history', internalOrderController.getOrderHistory);
+
+/**
+ * @swagger
  * /api/internal-orders:
  *   post:
  *     summary: Create internal order
