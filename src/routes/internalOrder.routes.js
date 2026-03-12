@@ -422,4 +422,71 @@ router.put('/:id/status', internalOrderController.updateOrderStatus);
  */
 router.post('/:id/lines', internalOrderController.addOrderLine);
 
+/**
+ * @swagger
+ * /api/internal-orders/{id}/create-production:
+ *   post:
+ *     summary: Create Production Order from Internal Order
+ *     description: Creates a production order from an approved internal order. Automatically links the items to their active recipes.
+ *     tags: [Internal Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internal Order ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               planned_start:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Planned production start date (optional, default now)"
+ *                 example: "2026-03-13T08:00:00Z"
+ *               planned_end:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Planned production end date (optional, default now)"
+ *                 example: "2026-03-13T16:00:00Z"
+ *     responses:
+ *       201:
+ *         description: Production order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       example: "po_1710241234567"
+ *                     prod_order_no:
+ *                       type: string
+ *                       example: "PO-202603-01"
+ *                     internal_order_id:
+ *                       type: string
+ *                       example: "ord_1710241234567"
+ *                     status:
+ *                       type: string
+ *                       example: "PLANNED"
+ *                     lines:
+ *                       type: array
+ *       400:
+ *         description: "Error: Invalid order status / No active recipe for item / Order has no lines"
+ *       404:
+ *         description: "Error: Internal order not found"
+ */
+router.post('/:id/create-production', authorize('CHEF', 'MANAGER', 'ADMIN'), internalOrderController.createProductionFromOrder);
+
 module.exports = router;

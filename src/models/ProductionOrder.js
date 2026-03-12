@@ -10,6 +10,11 @@ const productionOrderSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  internal_order_id: {
+    type: String,
+    default: null,
+    ref: 'InternalOrder'
+  },
   planned_start: {
     type: Date,
     required: true

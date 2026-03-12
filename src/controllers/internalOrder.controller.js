@@ -456,3 +456,130 @@ exports.addOrderLine = asyncHandler(async (req, res) => {
     ApiResponse.success(populatedLine, 'Order line added successfully', 201)
   );
 });
+
+// @desc    Create production order from internal order
+// @route   POST /api/internal-orders/:id/create-production
+// @access  Private (Chef, Manager, Admin)
+exports.createProductionFromOrder = asyncHandler(async (req, res) => {
+  const { planned_start, planned_end } = req.body;
+  
+  const order = await InternalOrder.findById(req.params.id)
+    .populate('store_org_unit_id', 'name code type')
+    .populate('created_by', 'username full_name');
+
+  if (!order) {
+    return res.status(404).json(
+      ApiResponse.error('Internal order not found', 404)
+    );
+  }
+
+  // Check if order is in a suitable status for production
+  if (!['APPROVED', 'PROCESSING'].includes(order.status)) {
+    return res.status(400).json(
+      ApiResponse.error('Order must be APPROVED or PROCESSING to create production', 400)
+    );
+  }
+
+  // Check if production already exists
+  if (order.production_order_id) {
+    return res.status(400).json(
+      ApiResponse.error('Production order already exists for this internal order', 400)
+    );
+  }
+
+  // Get order lines
+  const orderLines = await InternalOrderLine.find({ order_id: order._id })
+    .populate('item_id', 'sku name item_type');
+
+  if (!orderLines || orderLines.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('Order has no lines', 400)
+    );
+  }
+
+  // Check if all items have active recipes
+  const Recipe = require('../models/Recipe');
+  const productionLines = [];
+
+  for (const line of orderLines) {
+    // Find active recipe for this item
+    const recipe = await Recipe.findOne({
+      item_id: line.item_id._id,
+      status: 'ACTIVE'
+    });
+
+    if (!recipe) {
+      return res.status(400).json(
+        ApiResponse.error(
+          `Sản phẩm "${line.item_id.name}" (${line.item_id.sku}) không có công thức sản xuất hoạt động`,
+          400
+        )
+      );
+    }
+
+    productionLines.push({
+      item_id: line.item_id._id,
+      recipe_id: recipe._id,
+      planned_qty: line.qty_ordered,
+      uom_id: line.uom_id
+    });
+  }
+
+  // Generate production order number
+  const ProductionOrder = require('../models/ProductionOrder');
+  const orderCount = await ProductionOrder.countDocuments();
+  const prodOrderNo = `PO-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(orderCount + 1).padStart(2, '0')}`;
+
+  // Create production order
+  const productionOrder = await ProductionOrder.create({
+    _id: `po_${Date.now()}`,
+    prod_order_no: prodOrderNo,
+    internal_order_id: order._id,
+    planned_start: planned_start || new Date(),
+    planned_end: planned_end || new Date(),
+    status: 'PLANNED',
+    created_by: req.user.id
+  });
+
+  // Create production order lines
+  const ProductionOrderLine = require('../models/ProductionOrderLine');
+  const createdLines = await Promise.all(
+    productionLines.map(async (line, index) => {
+      return await ProductionOrderLine.create({
+        _id: `po_line_${productionOrder._id}_${index}`,
+        prod_order_id: productionOrder._id,
+        item_id: line.item_id,
+        recipe_id: line.recipe_id,
+        planned_qty: line.planned_qty,
+        actual_qty: 0,
+        uom_id: line.uom_id
+      });
+    })
+  );
+
+  // Update internal order with production_order_id
+  order.production_order_id = productionOrder._id;
+  await order.save();
+
+  const populatedOrder = await ProductionOrder.findById(productionOrder._id)
+    .populate('created_by', 'username full_name')
+    .populate('internal_order_id', 'order_no store_org_unit_id');
+
+  // --- [NOTIFICATION TRIGGER] ---
+  const notificationController = require('./notification.controller');
+  await notificationController.createNotificationInternal({
+    recipient_role: 'CHEF',
+    title: 'Đơn sản xuất mới',
+    message: `Đơn sản xuất ${prodOrderNo} từ đơn hàng ${order.order_no} (${order.store_org_unit_id.name}) vừa được tạo và sẵn sàng để thực hiện.`,
+    type: 'INFO',
+    ref_type: 'PRODUCTION_ORDER',
+    ref_id: productionOrder._id
+  });
+
+  return res.status(201).json(
+    ApiResponse.success({
+      ...populatedOrder.toObject(),
+      lines: createdLines
+    }, 'Production order created successfully from internal order', 201)
+  );
+});

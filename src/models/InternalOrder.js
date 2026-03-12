@@ -30,6 +30,11 @@ const internalOrderSchema = new mongoose.Schema({
     required: true,
     ref: 'AppUser'
   },
+  production_order_id: {
+    type: String,
+    default: null,
+    ref: 'ProductionOrder'
+  },
   total_amount: {
     type: Number,
     default: 0
