@@ -17,8 +17,8 @@ exports.getInternalOrders = asyncHandler(async (req, res) => {
   if (status) filter.status = status;
   if (store_org_unit_id) filter.store_org_unit_id = store_org_unit_id;
 
-  // Filter by user's org unit if not admin/manager
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  // Filter by user's org unit if not admin/manager/chef
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER') && !req.user.roles.includes('CHEF')) {
     filter.store_org_unit_id = req.user.org_unit_id;
   }
 
@@ -57,7 +57,7 @@ exports.getOrderHistory = asyncHandler(async (req, res) => {
   }
 
   // Check access
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER') && !req.user.roles.includes('CHEF')) {
     if (order.store_org_unit_id._id !== req.user.org_unit_id) {
       return res.status(403).json(
         ApiResponse.error('Access denied', 403)
@@ -141,7 +141,7 @@ exports.getInternalOrder = asyncHandler(async (req, res) => {
   }
 
   // Check access - store staff can only see their own orders
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER') && !req.user.roles.includes('CHEF')) {
     if (order.store_org_unit_id._id !== req.user.org_unit_id) {
       return res.status(403).json(
         ApiResponse.error('Access denied', 403)
@@ -187,9 +187,50 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     );
   }
 
+  // Fetch items and auto-assign prices from base_sell_price if not provided
+  const Item = require('../models/Item');
+  const processedLines = await Promise.all(
+    lines.map(async (line) => {
+      const item = await Item.findById(line.item_id);
+      if (!item) {
+        throw new Error(`Item with ID ${line.item_id} not found`);
+      }
+
+      // Use provided unit_price, or fall back to item's base_sell_price
+      const unitPrice = line.unit_price !== undefined && line.unit_price !== null 
+        ? line.unit_price 
+        : item.base_sell_price;
+
+      // Warn if item doesn't have a price
+      if (!unitPrice || unitPrice === 0) {
+        return {
+          ...line,
+          unit_price: unitPrice,
+          warning: `Sản phẩm ${item.name} (${item.sku}) chưa có giá bán!`
+        };
+      }
+
+      return {
+        ...line,
+        unit_price: unitPrice
+      };
+    })
+  );
+
+  // Check for items without prices
+  const itemsWithoutPrice = processedLines.filter(line => line.warning);
+  if (itemsWithoutPrice.length > 0) {
+    return res.status(400).json(
+      ApiResponse.error(
+        `Các sản phẩm sau chưa có giá bán: ${itemsWithoutPrice.map(l => l.warning).join('; ')}`,
+        400
+      )
+    );
+  }
+
   // Calculate total amount
   let totalAmount = 0;
-  lines.forEach(line => {
+  processedLines.forEach(line => {
     totalAmount += line.line_total || (line.qty_ordered * line.unit_price);
   });
 
@@ -212,7 +253,7 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
 
   // Create order lines
   const orderLines = await Promise.all(
-    lines.map(async (line, index) => {
+    processedLines.map(async (line, index) => {
       const orderLine = await InternalOrderLine.create({
         _id: `ord_line_${order._id}_${index}`,
         order_id: order._id,
@@ -357,7 +398,32 @@ exports.addOrderLine = asyncHandler(async (req, res) => {
   }
 
   const { item_id, qty_ordered, uom_id, unit_price } = req.body;
-  const line_total = qty_ordered * unit_price;
+
+  // Fetch item and auto-assign price if not provided
+  const Item = require('../models/Item');
+  const item = await Item.findById(item_id);
+  if (!item) {
+    return res.status(404).json(
+      ApiResponse.error('Item not found', 404)
+    );
+  }
+
+  // Use provided unit_price, or fall back to item's base_sell_price
+  const finalUnitPrice = unit_price !== undefined && unit_price !== null 
+    ? unit_price 
+    : item.base_sell_price;
+
+  // Warn if item doesn't have a price
+  if (!finalUnitPrice || finalUnitPrice === 0) {
+    return res.status(400).json(
+      ApiResponse.error(
+        `Sản phẩm ${item.name} (${item.sku}) chưa có giá bán!`,
+        400
+      )
+    );
+  }
+
+  const line_total = qty_ordered * finalUnitPrice;
 
   const orderLine = await InternalOrderLine.create({
     _id: `ord_line_${order._id}_${Date.now()}`,
@@ -365,7 +431,7 @@ exports.addOrderLine = asyncHandler(async (req, res) => {
     item_id,
     qty_ordered,
     uom_id,
-    unit_price,
+    unit_price: finalUnitPrice,
     line_total
   });
 

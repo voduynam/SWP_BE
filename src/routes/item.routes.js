@@ -16,22 +16,78 @@ const { protect, authorize } = require('../middlewares/auth');
  *   schemas:
  *     Item:
  *       type: object
+ *       required:
+ *         - _id
+ *         - sku
+ *         - name
+ *         - item_type
+ *         - base_uom_id
  *       properties:
  *         _id:
  *           type: string
+ *           description: Item unique identifier
+ *           example: "item_1710241234567"
  *         sku:
  *           type: string
+ *           description: Stock Keeping Unit - unique product code
+ *           example: "PRD-001"
  *         name:
  *           type: string
+ *           description: Product name
+ *           example: "Sản phẩm A"
  *         item_type:
  *           type: string
- *           enum: [RAW_MATERIAL, SEMI_FINISHED, FINISHED_GOOD]
+ *           enum: [RAW, FINISHED]
+ *           description: Type of item (RAW material or FINISHED product)
+ *           example: "FINISHED"
  *         base_uom_id:
  *           type: string
+ *           description: Base Unit of Measure ID
+ *           example: "uom_kg"
  *         category_id:
  *           type: string
- *         is_active:
- *           type: boolean
+ *           description: Category ID (optional)
+ *           example: "cat_001"
+ *           nullable: true
+ *         tracking_type:
+ *           type: string
+ *           enum: [NONE, LOT, LOT_EXPIRY, SERIAL]
+ *           description: Inventory tracking type
+ *           default: NONE
+ *           example: "LOT_EXPIRY"
+ *         shelf_life_days:
+ *           type: number
+ *           description: Shelf life in days (0 = no expiry)
+ *           default: 0
+ *           example: 365
+ *         cost_price:
+ *           type: number
+ *           description: Cost price (purchase price)
+ *           default: 0
+ *           example: 50000
+ *         base_sell_price:
+ *           type: number
+ *           description: Base selling price
+ *           default: 0
+ *           example: 75000
+ *         status:
+ *           type: string
+ *           enum: [ACTIVE, INACTIVE]
+ *           description: Item status
+ *           default: ACTIVE
+ *           example: "ACTIVE"
+ *       example:
+ *         _id: "item_1710241234567"
+ *         sku: "PRD-001"
+ *         name: "Sản phẩm A"
+ *         item_type: "FINISHED"
+ *         base_uom_id: "uom_kg"
+ *         category_id: "cat_001"
+ *         tracking_type: "LOT_EXPIRY"
+ *         shelf_life_days: 365
+ *         cost_price: 50000
+ *         base_sell_price: 75000
+ *         status: "ACTIVE"
  */
 
 // All routes require authentication

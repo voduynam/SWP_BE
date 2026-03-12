@@ -17,34 +17,109 @@ const upload = require('../middlewares/uploadDeliveryImage');
  *   schemas:
  *     Shipment:
  *       type: object
+ *       required:
+ *         - shipment_no
+ *         - order_id
+ *         - from_location_id
+ *         - to_location_id
+ *         - ship_date
  *       properties:
  *         _id:
  *           type: string
+ *           description: Shipment unique identifier
+ *           example: "ship_1710241234567"
  *         shipment_no:
  *           type: string
+ *           description: Shipment number (auto-generated SHP-XXXX)
+ *           example: "SHP-0001"
  *         order_id:
  *           type: string
+ *           description: Parent order ID
+ *           example: "ord_1710241234567"
  *         from_location_id:
  *           type: string
+ *           description: Source location/warehouse ID
+ *           example: "loc_kitchen"
  *         to_location_id:
  *           type: string
+ *           description: Destination location/store ID
+ *           example: "loc_store_001"
  *         ship_date:
  *           type: string
- *           format: date
+ *           format: date-time
+ *           description: Shipment date
+ *           example: "2026-03-12T14:00:00Z"
  *         status:
  *           type: string
  *           enum: [DRAFT, PICKED, SHIPPED, IN_TRANSIT, DELIVERED, CANCELLED]
+ *           description: Shipment status
+ *           example: "SHIPPED"
+ *         delivery_photo_url:
+ *           type: string
+ *           description: Delivery proof photo URL (nullable)
+ *           example: "https://cloudinary.com/delivery_photo_123.jpg"
+ *           nullable: true
+ *         delivery_photo_uploaded_at:
+ *           type: string
+ *           format: date-time
+ *           description: When delivery photo was uploaded
+ *           example: "2026-03-12T16:30:00Z"
+ *           nullable: true
  *         created_by:
  *           type: string
+ *           description: User ID who created the shipment
+ *           example: "user_123"
+ *       example:
+ *         _id: "ship_1710241234567"
+ *         shipment_no: "SHP-0001"
+ *         order_id: "ord_1710241234567"
+ *         from_location_id: "loc_kitchen"
+ *         to_location_id: "loc_store_001"
+ *         ship_date: "2026-03-12T14:00:00Z"
+ *         status: "SHIPPED"
+ *         delivery_photo_url: null
+ *         delivery_photo_uploaded_at: null
+ *         created_by: "user_123"
+ *
  *     ShipmentLine:
  *       type: object
+ *       required:
+ *         - item_id
+ *         - qty
+ *         - uom_id
  *       properties:
+ *         _id:
+ *           type: string
+ *           description: Shipment line unique identifier
+ *           example: "ship_line_1710241234567_0"
+ *         shipment_id:
+ *           type: string
+ *           description: Parent shipment ID
+ *           example: "ship_1710241234567"
  *         item_id:
  *           type: string
+ *           description: Item/Product ID
+ *           example: "item_001"
  *         qty:
  *           type: number
+ *           description: Quantity shipped
+ *           example: 10
  *         uom_id:
  *           type: string
+ *           description: Unit of Measure ID
+ *           example: "uom_kg"
+ *         order_line_id:
+ *           type: string
+ *           description: Reference to original order line (nullable)
+ *           example: "ord_line_1710241234567_0"
+ *           nullable: true
+ *       example:
+ *         _id: "ship_line_1710241234567_0"
+ *         shipment_id: "ship_1710241234567"
+ *         item_id: "item_001"
+ *         qty: 10
+ *         uom_id: "uom_kg"
+ *         order_line_id: "ord_line_1710241234567_0"
  */
 
 // All routes require authentication
