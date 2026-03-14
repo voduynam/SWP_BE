@@ -368,6 +368,7 @@ router.post('/org-units', authorize('ADMIN'), masterDataController.createOrgUnit
 router.get('/locations', masterDataController.getLocations);
 router.get('/locations/:id', masterDataController.getLocation);
 router.post('/locations', authorize('MANAGER', 'ADMIN'), masterDataController.createLocation);
+router.post('/seed-store-locations', authorize('ADMIN', 'MANAGER', 'CHEF', 'SUPPLY_COORDINATOR'), masterDataController.seedStoreLocations);
 
 // ========== Role Routes ==========
 

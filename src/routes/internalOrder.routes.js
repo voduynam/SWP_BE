@@ -347,7 +347,7 @@ router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), internalOrderCont
  *       200:
  *         description: Status updated
  */
-router.put('/:id/status', internalOrderController.updateOrderStatus);
+router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN'), internalOrderController.updateOrderStatus);
 
 /**
  * @swagger

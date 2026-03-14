@@ -141,7 +141,7 @@ router.get('/my-routes/list', authorize('DRIVER'), getMyRoutes);
  *         description: Forbidden - Only ADMIN, MANAGER, SUPPLY_COORDINATOR can create
  */
 router.route('/')
-    .get(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), getDeliveryRoutes)
+    .get(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'CHEF'), getDeliveryRoutes)
     .post(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), createDeliveryRoute);
 
 /**
@@ -177,7 +177,7 @@ router.route('/')
  *         description: Route updated
  */
 router.route('/:id')
-    .get(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), getDeliveryRoute)
+    .get(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'CHEF'), getDeliveryRoute)
     .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), updateDeliveryRoute);
 
 /**
@@ -209,7 +209,7 @@ router.route('/:id')
  *         description: Status updated
  */
 router.route('/:id/status')
-    .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), updateRouteStatus);
+    .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'DRIVER'), updateRouteStatus);
 
 /**
  * @swagger

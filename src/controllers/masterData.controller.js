@@ -110,12 +110,19 @@ exports.getLocations = asyncHandler(async (req, res) => {
   const filter = {};
   if (org_unit_id) filter.org_unit_id = org_unit_id;
   if (status) filter.status = status;
-  
-  // Filter by user's org unit if not admin/manager
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
-    filter.org_unit_id = req.user.org_unit_id;
+
+  // Không truyền org_unit_id = lấy tất cả kho (dropdown Kho nhận cần thấy đủ). Có truyền org_unit_id thì user không thuộc nhóm quyền chỉ xem org của mình.
+  const hasOrgFilter = !!org_unit_id;
+  if (hasOrgFilter) {
+    const canAccessAnyOrg = Array.isArray(req.user.roles) && (
+      req.user.roles.includes('ADMIN') ||
+      req.user.roles.includes('MANAGER') ||
+      req.user.roles.includes('CHEF') ||
+      req.user.roles.includes('SUPPLY_COORDINATOR')
+    );
+    if (!canAccessAnyOrg) filter.org_unit_id = req.user.org_unit_id;
   }
-  
+
   const locations = await Location.find(filter)
     .populate('org_unit_id', 'name code type')
     .sort({ name: 1 });
@@ -143,6 +150,54 @@ exports.createLocation = asyncHandler(async (req, res) => {
   const populated = await Location.findById(location._id)
     .populate('org_unit_id', 'name code type');
   return res.status(201).json(ApiResponse.success(populated, 'Location created successfully', 201));
+});
+
+// Tạo sẵn OrgUnit + Location "Kho Q1" (Cửa hàng Quận 1) nếu chưa có – dùng cho dropdown Kho nhận
+exports.seedStoreLocations = asyncHandler(async (req, res) => {
+  const created = { orgUnits: [], locations: [] };
+
+  const ensure = async ({ orgId, orgCode, orgName, locId, locCode, locName }) => {
+    let org = await OrgUnit.findById(orgId);
+    if (!org) {
+      org = await OrgUnit.create({
+        _id: orgId,
+        type: 'STORE',
+        code: orgCode,
+        name: orgName,
+        address: '',
+        district: '',
+        city: '',
+        status: 'ACTIVE',
+      });
+      created.orgUnits.push(org);
+    }
+    let loc = await Location.findById(locId);
+    if (!loc) {
+      loc = await Location.create({
+        _id: locId,
+        org_unit_id: orgId,
+        code: locCode,
+        name: locName,
+        status: 'ACTIVE',
+      });
+      created.locations.push(loc);
+    }
+  };
+
+  await ensure({
+    orgId: 'org_store_q1',
+    orgCode: 'STORE_Q1',
+    orgName: 'Cửa hàng Quận 1',
+    locId: 'loc_str_q1',
+    locCode: 'WH_STR_Q1',
+    locName: 'Kho Q1',
+  });
+
+  const message =
+    created.orgUnits.length || created.locations.length
+      ? `Đã tạo ${created.orgUnits.length} đơn vị, ${created.locations.length} kho (Kho Q1).`
+      : 'Kho cửa hàng đã tồn tại.';
+  return res.status(200).json(ApiResponse.success(created, message));
 });
 
 // ========== Roles ==========

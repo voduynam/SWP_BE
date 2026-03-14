@@ -115,9 +115,8 @@ const paymentSchema = new mongoose.Schema({
   timestamps: false
 });
 
-// Index để tìm kiếm nhanh
+// Index để tìm kiếm nhanh (payment_no already has unique index via schema)
 paymentSchema.index({ order_id: 1 });
-paymentSchema.index({ payment_no: 1 });
 paymentSchema.index({ payment_status: 1 });
 paymentSchema.index({ payos_transaction_id: 1 });
 

@@ -3,6 +3,7 @@ const Shipment = require('../models/Shipment');
 const ShipmentLine = require('../models/ShipmentLine');
 const ShipmentLineLot = require('../models/ShipmentLineLot');
 const InternalOrder = require('../models/InternalOrder');
+const Location = require('../models/Location');
 const ApiResponse = require('../utils/ApiResponse');
 
 // @desc    Get all shipments
@@ -85,6 +86,29 @@ exports.getShipment = asyncHandler(async (req, res) => {
 // @access  Private (Kitchen Staff, Manager, Admin)
 exports.createShipment = asyncHandler(async (req, res) => {
   const { order_id, from_location_id, to_location_id, ship_date, lines } = req.body;
+
+  // Bắt buộc kho xuất và kho nhận (cho phép điều chỉnh kho nhận khi tạo phiếu)
+  if (!from_location_id || !to_location_id) {
+    return res.status(400).json(
+      ApiResponse.error('from_location_id and to_location_id are required', 400)
+    );
+  }
+
+  const [fromLocation, toLocation] = await Promise.all([
+    Location.findById(from_location_id),
+    Location.findById(to_location_id)
+  ]);
+
+  if (!fromLocation || fromLocation.status !== 'ACTIVE') {
+    return res.status(400).json(
+      ApiResponse.error('Invalid or inactive from_location_id (kho xuất)', 400)
+    );
+  }
+  if (!toLocation || toLocation.status !== 'ACTIVE') {
+    return res.status(400).json(
+      ApiResponse.error('Invalid or inactive to_location_id (kho nhận)', 400)
+    );
+  }
 
   // Verify order exists and is approved
   const order = await InternalOrder.findById(order_id);
@@ -192,9 +216,9 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
   shipment.status = status;
   shipment.updated_at = new Date();
 
-  // Handle delivery photo upload when status = DELIVERED
+  // Handle delivery photo upload when status = DELIVERED (file lưu local: uploads/delivery-proof)
   if (status === 'DELIVERED' && req.file) {
-    shipment.delivery_photo_url = req.file.path;
+    shipment.delivery_photo_url = `/uploads/delivery-proof/${req.file.filename}`;
     shipment.delivery_photo_uploaded_at = new Date();
   }
 

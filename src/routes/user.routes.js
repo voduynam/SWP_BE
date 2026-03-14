@@ -109,8 +109,8 @@ router.get('/', authorize('ADMIN', 'MANAGER'), userController.getAllUsers);
  */
 // @route   GET /api/users/drivers/list
 // @desc    Get all drivers
-// @access  Private
-router.get('/drivers/list', userController.getDrivers);
+// @access  Private (ADMIN, MANAGER, SUPPLY_COORDINATOR)
+router.get('/drivers/list', authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), userController.getDrivers);
 
 /**
  * @swagger
