@@ -270,7 +270,7 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.creat
  *       413:
  *         description: Payload too large - File quá lớn (max 5MB)
  */
-router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN'), upload.single('delivery_photo'), shipmentController.updateShipmentStatus);
+router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER'), upload.single('delivery_photo'), shipmentController.updateShipmentStatus);
 
 /**
  * @swagger

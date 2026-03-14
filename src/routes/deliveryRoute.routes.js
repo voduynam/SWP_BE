@@ -209,7 +209,7 @@ router.route('/:id')
  *         description: Status updated
  */
 router.route('/:id/status')
-    .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), updateRouteStatus);
+    .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'DRIVER'), updateRouteStatus);
 
 /**
  * @swagger
@@ -322,6 +322,6 @@ router.route('/:id/stops')
  *         description: Payload too large - File quá lớn (max 5MB)
  */
 router.route('/:id/stops/:stopId/status')
-    .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR'), upload.single('delivery_photo'), updateStopStatus);
+    .put(authorize('ADMIN', 'MANAGER', 'SUPPLY_COORDINATOR', 'DRIVER'), upload.single('delivery_photo'), updateStopStatus);
 
 module.exports = router;

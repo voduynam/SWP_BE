@@ -610,11 +610,11 @@ Body (JSON):
 | Endpoint | ADMIN | MANAGER | SUPPLY_COORDINATOR | DRIVER |
 |----------|-------|---------|-------------------|--------|
 | Create Shipment | ✅ | ✅ | ✅ | ❌ |
-| Update Shipment Status | ✅ | ✅ | ✅ | ❌ |
-| Get Drivers | ✅ | ✅ | ✅ | ❌ |
+| Update Shipment Status | ✅ | ✅ | ✅ | ✅ |
+| Get Drivers | ✅ | ✅ | ✅ | ✅ |
 | Create Route | ✅ | ✅ | ✅ | ❌ |
-| Update Route Status | ✅ | ✅ | ✅ | ❌ |
-| Upload Proof Photo | ✅ | ✅ | ✅ | ❌ |
+| Update Route Status | ✅ | ✅ | ✅ | ✅ |
+| Upload Proof Photo | ✅ | ✅ | ✅ | ✅ |
 
 **Lưu ý:** Có thể mở rộng quyền DRIVER để upload ảnh chứng minh thực tế
 
