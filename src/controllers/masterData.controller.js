@@ -104,6 +104,34 @@ exports.createOrgUnit = asyncHandler(async (req, res) => {
   return res.status(201).json(ApiResponse.success(orgUnit, 'Organization unit created successfully', 201));
 });
 
+exports.updateOrgUnit = asyncHandler(async (req, res) => {
+  const { code, name, address, district, city, status } = req.body;
+  
+  const orgUnit = await OrgUnit.findById(req.params.id);
+  if (!orgUnit) {
+    return res.status(404).json(ApiResponse.error('Organization unit not found', 404));
+  }
+
+  // Update fields
+  if (code) orgUnit.code = code;
+  if (name) orgUnit.name = name;
+  if (address) orgUnit.address = address;
+  if (district) orgUnit.district = district;
+  if (city) orgUnit.city = city;
+  if (status) orgUnit.status = status;
+
+  await orgUnit.save();
+  return res.status(200).json(ApiResponse.success(orgUnit, 'Organization unit updated successfully'));
+});
+
+exports.deleteOrgUnit = asyncHandler(async (req, res) => {
+  const orgUnit = await OrgUnit.findByIdAndDelete(req.params.id);
+  if (!orgUnit) {
+    return res.status(404).json(ApiResponse.error('Organization unit not found', 404));
+  }
+  return res.status(200).json(ApiResponse.success(null, 'Organization unit deleted successfully'));
+});
+
 // ========== Locations ==========
 exports.getLocations = asyncHandler(async (req, res) => {
   const { org_unit_id, status } = req.query;

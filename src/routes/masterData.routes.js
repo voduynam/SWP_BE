@@ -313,9 +313,90 @@ router.post('/suppliers', authorize('MANAGER', 'ADMIN'), masterDataController.cr
  *       403:
  *         description: Forbidden - Admin access required
  */
+
+/**
+ * @swagger
+ * /api/master-data/org-units/{id}:
+ *   put:
+ *     summary: Update organization unit (Admin only)
+ *     tags: [Master Data]
+ *     description: Update an existing organization unit
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization unit ID
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: Unique code for the org unit
+ *                 example: STORE_HCM
+ *               name:
+ *                 type: string
+ *                 description: Name of the organization unit
+ *                 example: Kho Hồ Chí Minh
+ *               address:
+ *                 type: string
+ *                 example: 123 Nguyễn Văn Linh
+ *               district:
+ *                 type: string
+ *                 example: Quận 7
+ *               city:
+ *                 type: string
+ *                 example: TP. Hồ Chí Minh
+ *               status:
+ *                 type: string
+ *                 enum: [ACTIVE, INACTIVE]
+ *                 example: ACTIVE
+ *     responses:
+ *       200:
+ *         description: Organization unit updated successfully
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin access required
+ *       404:
+ *         description: Organization unit not found
+ *   delete:
+ *     summary: Delete organization unit (Admin only)
+ *     tags: [Master Data]
+ *     description: Delete an organization unit
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Organization unit ID
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Organization unit deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Admin access required
+ *       404:
+ *         description: Organization unit not found
+ */
 router.get('/org-units', masterDataController.getOrgUnits);
 router.get('/org-units/:id', masterDataController.getOrgUnit);
 router.post('/org-units', authorize('ADMIN'), masterDataController.createOrgUnit);
+router.put('/org-units/:id', authorize('ADMIN'), masterDataController.updateOrgUnit);
+router.delete('/org-units/:id', authorize('ADMIN'), masterDataController.deleteOrgUnit);
 
 // ========== Location Routes ==========
 
