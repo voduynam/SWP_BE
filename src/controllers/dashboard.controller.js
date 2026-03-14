@@ -1,5 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const InternalOrder = require('../models/InternalOrder');
+const InternalOrderLine = require('../models/InternalOrderLine');
 const ProductionOrder = require('../models/ProductionOrder');
 const Shipment = require('../models/Shipment');
 const InventoryBalance = require('../models/InventoryBalance');
@@ -360,6 +361,153 @@ exports.getShipmentStatistics = asyncHandler(async (req, res) => {
       on_time_delivery_rate: onTimeRate,
       total_shipments: totalShipments,
       delivered_shipments: deliveredShipments
+    })
+  );
+});
+
+// @desc    Get profit statistics (Revenue - Cost of Goods Sold)
+// @route   GET /api/dashboard/profit
+// @access  Private
+exports.getProfitStatistics = asyncHandler(async (req, res) => {
+  const { start_date, end_date, org_unit_id, group_by } = req.query;
+  
+  const startDate = start_date ? new Date(start_date) : new Date(new Date().setDate(new Date().getDate() - 30));
+  const endDate = end_date ? new Date(end_date) : new Date();
+  const groupBy = group_by || 'day'; // day, week, month
+
+  const filter = { 
+    order_date: { $gte: startDate, $lte: endDate },
+    status: { $in: ['RECEIVED', 'SHIPPED'] } // Only consider completed/shipped orders
+  };
+  
+  if (org_unit_id) {
+    filter.store_org_unit_id = org_unit_id;
+  } else if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+    filter.store_org_unit_id = req.user.org_unit_id;
+  }
+
+  // Get all orders with their line items and item details
+  const orders = await InternalOrder.find(filter);
+  const orderIds = orders.map(order => order._id);
+
+  const orderLines = await InternalOrderLine.find({ order_id: { $in: orderIds } })
+    .populate('item_id', 'cost_price sku name');
+
+  // Calculate profit for each line
+  let totalRevenue = 0;
+  let totalCost = 0;
+  let profits = [];
+
+  orderLines.forEach(line => {
+    const revenue = line.line_total; // unit_price * qty_ordered
+    const cost = (line.item_id?.cost_price || 0) * line.qty_ordered;
+    const profit = revenue - cost;
+    
+    totalRevenue += revenue;
+    totalCost += cost;
+    
+    profits.push({
+      order_id: line.order_id,
+      item_id: line.item_id?._id,
+      item_name: line.item_id?.name,
+      item_sku: line.item_id?.sku,
+      qty: line.qty_ordered,
+      selling_price: line.unit_price,
+      cost_price: line.item_id?.cost_price || 0,
+      revenue,
+      cost,
+      profit
+    });
+  });
+
+  const totalProfit = totalRevenue - totalCost;
+  const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : 0;
+
+  // Group profits by date if requested
+  let profitTrend = [];
+  if (groupBy) {
+    const profitByDate = {};
+    
+    for (const orderId of orderIds) {
+      const order = orders.find(o => o._id === orderId);
+      const orderProfit = profits
+        .filter(p => p.order_id === orderId)
+        .reduce((sum, p) => sum + p.profit, 0);
+      
+      let dateKey;
+      switch (groupBy) {
+        case 'week':
+          dateKey = `Week ${Math.floor((order.order_date.getDate() - 1) / 7 + 1)}`;
+          break;
+        case 'month':
+          dateKey = order.order_date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          break;
+        default: // day
+          dateKey = order.order_date.toLocaleDateString('en-US');
+      }
+      
+      if (!profitByDate[dateKey]) {
+        profitByDate[dateKey] = { revenue: 0, cost: 0, profit: 0, order_count: 0 };
+      }
+      
+      const dayRevenue = profits
+        .filter(p => p.order_id === orderId)
+        .reduce((sum, p) => sum + p.revenue, 0);
+      const dayCost = profits
+        .filter(p => p.order_id === orderId)
+        .reduce((sum, p) => sum + p.cost, 0);
+      
+      profitByDate[dateKey].revenue += dayRevenue;
+      profitByDate[dateKey].cost += dayCost;
+      profitByDate[dateKey].profit += orderProfit;
+      profitByDate[dateKey].order_count += 1;
+    }
+    
+    profitTrend = Object.entries(profitByDate).map(([date, data]) => ({
+      date,
+      ...data,
+      margin: data.revenue > 0 ? ((data.profit / data.revenue) * 100).toFixed(2) : 0
+    }));
+  }
+
+  // Get top profit items
+  const profitByItem = {};
+  profits.forEach(p => {
+    if (!profitByItem[p.item_id]) {
+      profitByItem[p.item_id] = {
+        item_id: p.item_id,
+        item_name: p.item_name,
+        item_sku: p.item_sku,
+        qty_sold: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        total_profit: 0
+      };
+    }
+    profitByItem[p.item_id].qty_sold += p.qty;
+    profitByItem[p.item_id].total_revenue += p.revenue;
+    profitByItem[p.item_id].total_cost += p.cost;
+    profitByItem[p.item_id].total_profit += p.profit;
+  });
+
+  const topProfitItems = Object.values(profitByItem)
+    .sort((a, b) => b.total_profit - a.total_profit)
+    .slice(0, 10);
+
+  return res.status(200).json(
+    ApiResponse.success({
+      period: { start_date: startDate, end_date: endDate },
+      summary: {
+        total_revenue: totalRevenue,
+        total_cost: totalCost,
+        total_profit: totalProfit,
+        profit_margin_percent: profitMargin,
+        order_count: orderIds.length,
+        item_count: Object.keys(profitByItem).length
+      },
+      trend: profitTrend,
+      top_profit_items: topProfitItems,
+      all_profits: profits
     })
   );
 });
