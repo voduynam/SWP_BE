@@ -108,19 +108,15 @@ exports.createOrgUnit = asyncHandler(async (req, res) => {
 exports.getLocations = asyncHandler(async (req, res) => {
   const { org_unit_id, status } = req.query;
   const filter = {};
-  if (org_unit_id) filter.org_unit_id = org_unit_id;
   if (status) filter.status = status;
 
-  // Không truyền org_unit_id = lấy tất cả kho (dropdown Kho nhận cần thấy đủ). Có truyền org_unit_id thì user không thuộc nhóm quyền chỉ xem org của mình.
-  const hasOrgFilter = !!org_unit_id;
-  if (hasOrgFilter) {
-    const canAccessAnyOrg = Array.isArray(req.user.roles) && (
-      req.user.roles.includes('ADMIN') ||
-      req.user.roles.includes('MANAGER') ||
-      req.user.roles.includes('CHEF') ||
-      req.user.roles.includes('SUPPLY_COORDINATOR')
-    );
-    if (!canAccessAnyOrg) filter.org_unit_id = req.user.org_unit_id;
+  const roles = (req.user.roles || []).map(r => (r && typeof r === 'object' && r.code) ? r.code : String(r));
+  const canSeeAllLocations = ['ADMIN', 'MANAGER', 'CHEF', 'SUPPLY_COORDINATOR'].some(r => roles.includes(r));
+
+  if (canSeeAllLocations) {
+    if (org_unit_id) filter.org_unit_id = org_unit_id;
+  } else {
+    filter.org_unit_id = org_unit_id || req.user.org_unit_id;
   }
 
   const locations = await Location.find(filter)

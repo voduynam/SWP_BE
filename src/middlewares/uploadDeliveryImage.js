@@ -1,21 +1,20 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cloudinaryModule = require('cloudinary');
+const CloudinaryStorage = require('multer-storage-cloudinary');
 
-const uploadDir = 'uploads/delivery-proof';
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// Package multer-storage-cloudinary cần opts.cloudinary có .v2 (root module), không phải cloudinary.v2
+cloudinaryModule.v2.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-// Lưu file local - khớp DELIVERY_COMPLETE_WORKFLOW: form-data status + delivery_photo
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    const safeId = (req.params.id || 'upload').replace(/[^a-zA-Z0-9_-]/g, '_');
-    cb(null, `Shipment_${safeId}_${Date.now()}${ext}`);
-  }
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinaryModule,
+    folder: 'delivery-proof',
+    allowedFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    params: { resource_type: 'auto' },
+    filename: (req, file, cb) => cb(undefined, 'delivery_' + String(Date.now()))
 });
 
 const fileFilter = (req, file, cb) => {

@@ -359,7 +359,7 @@ exports.updateStopStatus = asyncHandler(async (req, res) => {
 
     // Handle delivery photo upload
     if (status === 'COMPLETED' && req.file) {
-        stop.delivery_photo_url = req.file.path;
+        stop.delivery_photo_url = req.file.secure_url || req.file.url || req.file.path;
         stop.delivery_photo_uploaded_at = new Date();
     }
 

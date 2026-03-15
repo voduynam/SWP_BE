@@ -216,9 +216,9 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
   shipment.status = status;
   shipment.updated_at = new Date();
 
-  // Handle delivery photo upload when status = DELIVERED (file lưu local: uploads/delivery-proof)
+  // Handle delivery photo upload when status = DELIVERED (multer-storage-cloudinary → req.file.secure_url)
   if (status === 'DELIVERED' && req.file) {
-    shipment.delivery_photo_url = `/uploads/delivery-proof/${req.file.filename}`;
+    shipment.delivery_photo_url = req.file.secure_url || req.file.url || req.file.path;
     shipment.delivery_photo_uploaded_at = new Date();
   }
 
