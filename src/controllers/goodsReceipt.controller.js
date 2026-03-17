@@ -25,8 +25,23 @@ exports.getGoodsReceipts = asyncHandler(async (req, res) => {
     if (end_date) filter.received_date.$lte = new Date(end_date);
   }
 
+  // Filter by user's organization unit for STORE_STAFF
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+    // For STORE_STAFF, only show receipts for their store
+    const Location = require('../models/Location');
+    const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
+    const locationIds = userLocations.map(l => l._id);
+    
+    // Find shipments that deliver to user's locations
+    const Shipment = require('../models/Shipment');
+    const userShipments = await Shipment.find({ to_location_id: { $in: locationIds } });
+    const shipmentIds = userShipments.map(s => s._id);
+    
+    filter.shipment_id = { $in: shipmentIds };
+  }
+
   const receipts = await GoodsReceipt.find(filter)
-    .populate('shipment_id', 'shipment_no ship_date')
+    .populate('shipment_id', 'shipment_no ship_date to_location_id')
     .populate('received_by', 'username full_name')
     .skip(skip)
     .limit(limit)
@@ -44,13 +59,27 @@ exports.getGoodsReceipts = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getGoodsReceipt = asyncHandler(async (req, res) => {
   const receipt = await GoodsReceipt.findById(req.params.id)
-    .populate('shipment_id', 'shipment_no ship_date status')
+    .populate('shipment_id', 'shipment_no ship_date status to_location_id')
     .populate('received_by', 'username full_name');
 
   if (!receipt) {
     return res.status(404).json(
       ApiResponse.error('Goods receipt not found', 404)
     );
+  }
+
+  // Check if user has access to this receipt (for STORE_STAFF)
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+    const Location = require('../models/Location');
+    const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
+    const locationIds = userLocations.map(l => l._id);
+    
+    // Check if the shipment's destination is in user's locations
+    if (!locationIds.includes(receipt.shipment_id.to_location_id)) {
+      return res.status(403).json(
+        ApiResponse.error('Access denied. You can only view receipts for your store', 403)
+      );
+    }
   }
 
   const receiptLines = await GoodsReceiptLine.find({ receipt_id: receipt._id })
@@ -77,6 +106,20 @@ exports.createGoodsReceipt = asyncHandler(async (req, res) => {
     return res.status(404).json(
       ApiResponse.error('Shipment not found', 404)
     );
+  }
+
+  // Check if user has access to this shipment (for STORE_STAFF)
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+    const Location = require('../models/Location');
+    const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
+    const locationIds = userLocations.map(l => l._id);
+    
+    // Check if the shipment's destination is in user's locations
+    if (!locationIds.includes(shipment.to_location_id)) {
+      return res.status(403).json(
+        ApiResponse.error('Access denied. You can only create receipts for shipments to your store', 403)
+      );
+    }
   }
 
   if (shipment.status !== 'SHIPPED' && shipment.status !== 'IN_TRANSIT') {
@@ -147,11 +190,27 @@ exports.createGoodsReceipt = asyncHandler(async (req, res) => {
 // @route   PUT /api/goods-receipts/:id/confirm
 // @access  Private (Store Staff, Manager, Admin)
 exports.confirmGoodsReceipt = asyncHandler(async (req, res) => {
-  const receipt = await GoodsReceipt.findById(req.params.id);
+  const receipt = await GoodsReceipt.findById(req.params.id)
+    .populate('shipment_id', 'to_location_id order_id');
+  
   if (!receipt) {
     return res.status(404).json(
       ApiResponse.error('Goods receipt not found', 404)
     );
+  }
+
+  // Check if user has access to this receipt (for STORE_STAFF)
+  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+    const Location = require('../models/Location');
+    const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
+    const locationIds = userLocations.map(l => l._id);
+    
+    // Check if the shipment's destination is in user's locations
+    if (!locationIds.includes(receipt.shipment_id.to_location_id)) {
+      return res.status(403).json(
+        ApiResponse.error('Access denied. You can only confirm receipts for your store', 403)
+      );
+    }
   }
 
   if (receipt.status === 'RECEIVED') {
@@ -164,7 +223,7 @@ exports.confirmGoodsReceipt = asyncHandler(async (req, res) => {
     .populate('item_id')
     .populate('shipment_line_id');
 
-  const shipment = await Shipment.findById(receipt.shipment_id);
+  const shipment = await Shipment.findById(receipt.shipment_id._id);
 
   // Process each line and update inventory
   for (const line of receiptLines) {
@@ -222,6 +281,7 @@ exports.confirmGoodsReceipt = asyncHandler(async (req, res) => {
   await shipment.save();
 
   // Update order status
+  const InternalOrder = require('../models/InternalOrder');
   const order = await InternalOrder.findById(shipment.order_id);
   if (order) {
     order.status = 'RECEIVED';
