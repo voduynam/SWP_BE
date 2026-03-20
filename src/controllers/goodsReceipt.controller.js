@@ -122,9 +122,15 @@ exports.createGoodsReceipt = asyncHandler(async (req, res) => {
     }
   }
 
-  if (shipment.status !== 'SHIPPED' && shipment.status !== 'IN_TRANSIT') {
+  // Allow receiving even if driver already marked the shipment as DELIVERED,
+  // so the store can still create/confirm GoodsReceipt to update inventory.
+  if (
+    shipment.status !== 'SHIPPED' &&
+    shipment.status !== 'IN_TRANSIT' &&
+    shipment.status !== 'DELIVERED'
+  ) {
     return res.status(400).json(
-      ApiResponse.error('Shipment must be shipped or in transit to receive', 400)
+      ApiResponse.error('Shipment must be shipped, in transit, or delivered to receive', 400)
     );
   }
 

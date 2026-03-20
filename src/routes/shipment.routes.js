@@ -193,7 +193,7 @@ router.get('/:id', shipmentController.getShipment);
  *       201:
  *         description: Shipment created
  */
-router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.createShipment);
+router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN', 'SUPPLY_COORDINATOR'), shipmentController.createShipment);
 
 /**
  * @swagger
@@ -270,7 +270,7 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.creat
  *       413:
  *         description: Payload too large - File quá lớn (max 5MB)
  */
-router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER'), upload.single('delivery_photo'), shipmentController.updateShipmentStatus);
+router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER', 'SUPPLY_COORDINATOR'), upload.single('delivery_photo'), shipmentController.updateShipmentStatus);
 
 /**
  * @swagger
@@ -290,6 +290,6 @@ router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER'), uploa
  *       200:
  *         description: Shipment dispatched and stock deducted
  */
-router.put('/:id/dispatch', authorize('CHEF', 'MANAGER', 'ADMIN'), shipmentController.confirmDispatch);
+router.put('/:id/dispatch', authorize('CHEF', 'MANAGER', 'ADMIN', 'SUPPLY_COORDINATOR'), shipmentController.confirmDispatch);
 
 module.exports = router;

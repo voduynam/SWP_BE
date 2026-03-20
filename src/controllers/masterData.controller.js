@@ -139,8 +139,12 @@ exports.getLocations = asyncHandler(async (req, res) => {
   if (org_unit_id) filter.org_unit_id = org_unit_id;
   if (status) filter.status = status;
   
-  // Filter by user's org unit if not admin/manager
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  // Filter by user's org unit if not admin/manager/supply coordinator
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     filter.org_unit_id = req.user.org_unit_id;
   }
   

@@ -23,6 +23,41 @@ exports.getShipments = asyncHandler(async (req, res) => {
     if (end_date) filter.ship_date.$lte = new Date(end_date);
   }
 
+  // DRIVERS: chỉ được xem shipment thuộc các delivery routes được phân cho họ.
+  // Nếu user có quyền cấp cao (ADMIN/MANAGER/CHEF/SUPPLY_COORDINATOR) thì không áp dụng lọc theo driver.
+  const roles = req.user?.roles || [];
+  const isDriverOnly = roles.includes('DRIVER') && !(
+    roles.includes('ADMIN') ||
+    roles.includes('MANAGER') ||
+    roles.includes('CHEF') ||
+    roles.includes('SUPPLY_COORDINATOR')
+  );
+  if (isDriverOnly) {
+    const AppUser = require('../models/AppUser');
+    const DeliveryRoute = require('../models/DeliveryRoute');
+    const RouteStop = require('../models/RouteStop');
+
+    const user = await AppUser.findById(req.user.id).select('full_name username');
+    const driverName = user?.full_name || user?.username;
+
+    // Tìm các route của driver hiện tại → lấy shipment_ids từ stops
+    const routes = await DeliveryRoute.find({ driver_name: driverName }).select('_id');
+    const routeIds = routes.map(r => r._id);
+
+    const stops = routeIds.length
+      ? await RouteStop.find({ route_id: { $in: routeIds } }).select('shipment_ids')
+      : [];
+
+    const shipmentIds = new Set();
+    for (const stop of stops) {
+      for (const s of stop.shipment_ids || []) {
+        shipmentIds.add(String(s));
+      }
+    }
+
+    filter._id = { $in: Array.from(shipmentIds) };
+  }
+
   const shipments = await Shipment.find(filter)
     .populate('order_id', 'order_no order_date')
     .populate('from_location_id', 'name code')
@@ -43,6 +78,32 @@ exports.getShipments = asyncHandler(async (req, res) => {
 // @route   GET /api/shipments/:id
 // @access  Private
 exports.getShipment = asyncHandler(async (req, res) => {
+  // DRIVERS: chỉ được xem shipment của chính họ
+  const roles = req.user?.roles || [];
+  const isDriverOnly = roles.includes('DRIVER') && !(
+    roles.includes('ADMIN') ||
+    roles.includes('MANAGER') ||
+    roles.includes('CHEF') ||
+    roles.includes('SUPPLY_COORDINATOR')
+  );
+  if (isDriverOnly) {
+    const AppUser = require('../models/AppUser');
+    const DeliveryRoute = require('../models/DeliveryRoute');
+    const RouteStop = require('../models/RouteStop');
+
+    const user = await AppUser.findById(req.user.id).select('full_name username');
+    const driverName = user?.full_name || user?.username;
+
+    const stop = await RouteStop.findOne({ shipment_ids: req.params.id }).select('route_id');
+    if (!stop) {
+      return res.status(403).json(ApiResponse.error('Access denied', 403));
+    }
+    const route = await DeliveryRoute.findById(stop.route_id).select('driver_name');
+    if (!route || route.driver_name !== driverName) {
+      return res.status(403).json(ApiResponse.error('Access denied', 403));
+    }
+  }
+
   const shipment = await Shipment.findById(req.params.id)
     .populate('order_id', 'order_no order_date status')
     .populate('from_location_id', 'name code')
@@ -189,16 +250,58 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
     );
   }
 
+  // DRIVERS: chỉ được cập nhật shipment thuộc các route của chính họ
+  const roles = req.user?.roles || [];
+  const isDriverOnly = roles.includes('DRIVER') && !(
+    roles.includes('ADMIN') ||
+    roles.includes('MANAGER') ||
+    roles.includes('CHEF') ||
+    roles.includes('SUPPLY_COORDINATOR')
+  );
+  if (isDriverOnly) {
+    const AppUser = require('../models/AppUser');
+    const DeliveryRoute = require('../models/DeliveryRoute');
+    const RouteStop = require('../models/RouteStop');
+
+    const user = await AppUser.findById(req.user.id).select('full_name username');
+    const driverName = user?.full_name || user?.username;
+
+    const stop = await RouteStop.findOne({ shipment_ids: shipment._id }).select('route_id');
+    if (!stop) {
+      return res.status(403).json(ApiResponse.error('Access denied', 403));
+    }
+
+    const route = await DeliveryRoute.findById(stop.route_id).select('driver_name');
+    if (!route || route.driver_name !== driverName) {
+      return res.status(403).json(ApiResponse.error('Access denied', 403));
+    }
+  }
+
   shipment.status = status;
   shipment.updated_at = new Date();
 
   // Handle delivery photo upload when status = DELIVERED
   if (status === 'DELIVERED' && req.file) {
-    shipment.delivery_photo_url = req.file.path;
+    // multer-storage-cloudinary thường trả URL qua secure_url/url thay vì path
+    shipment.delivery_photo_url =
+      req.file.secure_url || req.file.url || req.file.path;
     shipment.delivery_photo_uploaded_at = new Date();
   }
 
   await shipment.save();
+
+  // --- [WORKFLOW SYNC] ---
+  // When driver marks shipment as DELIVERED, the destination store should be
+  // able to "receive" the order (create/confirm goods receipt).
+  // Existing FE logic expects internal order status = SHIPPED before receiving.
+  if (status === 'DELIVERED') {
+    const order = await InternalOrder.findById(shipment.order_id);
+    if (order && order.status !== 'RECEIVED' && order.status !== 'CANCELLED') {
+      order.status = 'SHIPPED';
+      order.updated_at = new Date();
+      await order.save();
+    }
+  }
 
   const populatedShipment = await Shipment.findById(shipment._id)
     .populate('order_id', 'order_no order_date')

@@ -17,8 +17,13 @@ exports.getInternalOrders = asyncHandler(async (req, res) => {
   if (status) filter.status = status;
   if (store_org_unit_id) filter.store_org_unit_id = store_org_unit_id;
 
-  // Filter by user's org unit if not admin/manager/chef
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER') && !req.user.roles.includes('CHEF')) {
+  // Filter by user's org unit if not admin/manager/chef/supply coordinator
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('CHEF') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     filter.store_org_unit_id = req.user.org_unit_id;
   }
 
@@ -34,6 +39,38 @@ exports.getInternalOrders = asyncHandler(async (req, res) => {
     .skip(skip)
     .limit(limit)
     .sort({ order_date: -1 });
+
+  // --- [WORKFLOW SYNC - BACKFILL ON READ] ---
+  // If a shipment is already DELIVERED but the InternalOrder is still PROCESSING,
+  // we need to move it to SHIPPED so store can create/confirm GoodsReceipt.
+  // This covers historical data that was created before workflow sync was fixed.
+  if (orders.length) {
+    const Shipment = require('../models/Shipment');
+    const orderIds = orders.map(o => o._id);
+    const shipments = await Shipment.find({ order_id: { $in: orderIds } })
+      .select('order_id status');
+
+    const deliveredByOrderId = shipments.reduce((acc, s) => {
+      if (s?.status === 'DELIVERED') acc.add(String(s.order_id));
+      return acc;
+    }, new Set());
+
+    const toSave = [];
+    for (const order of orders) {
+      const hasDelivered = deliveredByOrderId.has(String(order._id));
+      if (
+        hasDelivered &&
+        !['RECEIVED', 'CANCELLED'].includes(order.status)
+      ) {
+        order.status = 'SHIPPED';
+        order.updated_at = new Date();
+        toSave.push(order.save());
+      }
+    }
+    if (toSave.length) {
+      await Promise.all(toSave);
+    }
+  }
 
   const total = await InternalOrder.countDocuments(filter);
 
@@ -57,7 +94,12 @@ exports.getOrderHistory = asyncHandler(async (req, res) => {
   }
 
   // Check access
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER') && !req.user.roles.includes('CHEF')) {
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('CHEF') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     if (order.store_org_unit_id._id !== req.user.org_unit_id) {
       return res.status(403).json(
         ApiResponse.error('Access denied', 403)
@@ -141,11 +183,28 @@ exports.getInternalOrder = asyncHandler(async (req, res) => {
   }
 
   // Check access - store staff can only see their own orders
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER') && !req.user.roles.includes('CHEF')) {
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('CHEF') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     if (order.store_org_unit_id._id !== req.user.org_unit_id) {
       return res.status(403).json(
         ApiResponse.error('Access denied', 403)
       );
+    }
+  }
+
+  // --- [WORKFLOW SYNC - BACKFILL ON READ (single)] ---
+  // Keep InternalOrder.status consistent with shipment delivery status.
+  if (!['RECEIVED', 'CANCELLED'].includes(order.status)) {
+    const Shipment = require('../models/Shipment');
+    const hasDelivered = await Shipment.exists({ order_id: order._id, status: 'DELIVERED' });
+    if (hasDelivered) {
+      order.status = 'SHIPPED';
+      order.updated_at = new Date();
+      await order.save();
     }
   }
 

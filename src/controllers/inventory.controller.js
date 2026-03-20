@@ -18,8 +18,12 @@ exports.getInventoryBalances = asyncHandler(async (req, res) => {
   if (item_id) filter.item_id = item_id;
   if (lot_id) filter.lot_id = lot_id;
 
-  // Filter by user's org unit locations if not admin/manager
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  // Filter by user's org unit locations if not admin/manager/supply coordinator
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
     const locationIds = userLocations.map(l => l._id);
     filter.location_id = { $in: locationIds };
@@ -60,8 +64,12 @@ exports.getInventoryTransactions = asyncHandler(async (req, res) => {
     if (end_date) filter.txn_time.$lte = new Date(end_date);
   }
 
-  // Filter by user's org unit locations if not admin/manager
-  if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  // Filter by user's org unit locations if not admin/manager/supply coordinator
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
     const locationIds = userLocations.map(l => l._id);
     filter.location_id = { $in: locationIds };
@@ -93,7 +101,11 @@ exports.getInventorySummary = asyncHandler(async (req, res) => {
   const filter = {};
   if (location_id) {
     filter.location_id = location_id;
-  } else if (!req.user.roles.includes('ADMIN') && !req.user.roles.includes('MANAGER')) {
+  } else if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
     const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
     const locationIds = userLocations.map(l => l._id);
     filter.location_id = { $in: locationIds };

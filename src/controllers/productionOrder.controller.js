@@ -5,6 +5,104 @@ const ProductionConsumption = require('../models/ProductionConsumption');
 const ProductionOutputLot = require('../models/ProductionOutputLot');
 const ApiResponse = require('../utils/ApiResponse');
 
+/**
+ * Backfill production output into InventoryBalance so FE inventory/lots pages show correct quantities.
+ * Idempotent: uses InventoryTransaction.ref_id = ProductionOutputLot._id.
+ */
+async function syncProductionOutputsToInventory({ prodOrderId, orgUnitId, createdByUserId }) {
+  const InventoryBalance = require('../models/InventoryBalance');
+  const InventoryTransaction = require('../models/InventoryTransaction');
+  const Location = require('../models/Location');
+
+  const orderLines = await ProductionOrderLine.find({ prod_order_id: prodOrderId }).select('_id item_id');
+  if (!orderLines.length) return;
+
+  const lineIds = orderLines.map(l => l._id);
+  const lineIdToItemId = new Map(orderLines.map(l => [String(l._id), l.item_id]));
+
+  const outputs = await ProductionOutputLot.find({ prod_order_line_id: { $in: lineIds } }).select('_id prod_order_line_id lot_id qty uom_id');
+  if (!outputs.length) return;
+
+  let finishedLocation = null;
+  if (orgUnitId) {
+    finishedLocation = await Location.findOne({
+      org_unit_id: orgUnitId,
+      $or: [
+        { code: { $regex: 'FINISH', $options: 'i' } },
+        { name: { $regex: 'FINISH', $options: 'i' } },
+        { code: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'PHAM', $options: 'i' } }
+      ]
+    });
+  }
+
+  if (!finishedLocation) {
+    finishedLocation = await Location.findOne({
+      $or: [
+        { code: { $regex: 'FINISH', $options: 'i' } },
+        { name: { $regex: 'FINISH', $options: 'i' } },
+        { code: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'PHAM', $options: 'i' } }
+      ]
+    });
+  }
+
+  // If we cannot find a finished-location, skip backfill to avoid breaking reads.
+  if (!finishedLocation) return;
+
+  for (const out of outputs) {
+    const exists = await InventoryTransaction.exists({
+      txn_type: 'PRODUCTION_IN',
+      ref_type: 'PRODUCTION_ORDER',
+      ref_id: out._id
+    });
+    if (exists) continue;
+
+    const itemId = lineIdToItemId.get(String(out.prod_order_line_id));
+    if (!itemId) continue;
+
+    const qtyNum = Number(out.qty) || 0;
+    if (qtyNum === 0) continue;
+
+    const balanceFilter = {
+      location_id: finishedLocation._id,
+      item_id: itemId,
+      lot_id: out.lot_id || null
+    };
+
+    let balance = await InventoryBalance.findOne(balanceFilter);
+    if (!balance) {
+      balance = await InventoryBalance.create({
+        location_id: finishedLocation._id,
+        item_id: itemId,
+        lot_id: out.lot_id || null,
+        qty_on_hand: 0,
+        qty_reserved: 0
+      });
+    }
+
+    balance.qty_on_hand += qtyNum;
+    balance.updated_at = new Date();
+    await balance.save();
+
+    await InventoryTransaction.create({
+      txn_time: new Date(),
+      location_id: finishedLocation._id,
+      item_id: itemId,
+      lot_id: out.lot_id || null,
+      qty: qtyNum,
+      uom_id: out.uom_id,
+      txn_type: 'PRODUCTION_IN',
+      ref_type: 'PRODUCTION_ORDER',
+      ref_id: out._id,
+      created_by: createdByUserId,
+      notes: `Backfill: production output (${prodOrderId})`
+    });
+  }
+}
+
 // @desc    Get all production orders
 // @route   GET /api/production-orders
 // @access  Private
@@ -40,12 +138,25 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
 // @access  Private
 exports.getProductionOrder = asyncHandler(async (req, res) => {
   const order = await ProductionOrder.findById(req.params.id)
-    .populate('created_by', 'username full_name');
+    .populate('created_by', 'username full_name org_unit_id');
 
   if (!order) {
     return res.status(404).json(
       ApiResponse.error('Production order not found', 404)
     );
+  }
+
+  // Backfill inventory for existing outputs (older data may not have been written to InventoryBalance).
+  // Triggered when user opens the production order detail in FE.
+  const orgUnitId = order.created_by?.org_unit_id?._id ?? order.created_by?.org_unit_id ?? null;
+  try {
+    await syncProductionOutputsToInventory({
+      prodOrderId: order._id,
+      orgUnitId,
+      createdByUserId: req.user.id
+    });
+  } catch (_) {
+    // Avoid breaking reads if backfill fails for any reason.
   }
 
   const orderLines = await ProductionOrderLine.find({ prod_order_id: order._id })
@@ -273,12 +384,97 @@ exports.recordOutput = asyncHandler(async (req, res) => {
   const output = await ProductionOutputLot.create({
     prod_order_line_id,
     lot_id,
-    qty,
+    qty: Number(qty) || 0,
     uom_id
   });
 
+  // Update inventory for finished goods (add qty to InventoryBalance + transaction)
+  // FE "Tồn kho bếp trung tâm" and "Nguyên liệu & lô sản xuất" rely on InventoryBalance by lot_id.
+  const InventoryBalance = require('../models/InventoryBalance');
+  const InventoryTransaction = require('../models/InventoryTransaction');
+  const Location = require('../models/Location');
+
+  // Try to scope to the production order's org unit; fallback to any matching finished location.
+  const orderLineWithOrder = await ProductionOrderLine.findById(prod_order_line_id).populate({
+    path: 'prod_order_id',
+    populate: { path: 'created_by', select: 'org_unit_id' }
+  });
+
+  const orgUnitId =
+    orderLineWithOrder?.prod_order_id?.created_by?.org_unit_id?._id ??
+    orderLineWithOrder?.prod_order_id?.created_by?.org_unit_id ??
+    null;
+
+  const qtyNum = Number(qty) || 0;
+
+  let finishedLocation = null;
+  if (orgUnitId) {
+    finishedLocation = await Location.findOne({
+      org_unit_id: orgUnitId,
+      $or: [
+        { code: { $regex: 'FINISH', $options: 'i' } },
+        { name: { $regex: 'FINISH', $options: 'i' } },
+        { code: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'PHAM', $options: 'i' } },
+        { name: { $regex: 'THÀNH', $options: 'i' } }
+      ]
+    });
+  }
+
+  if (!finishedLocation) {
+    finishedLocation = await Location.findOne({
+      $or: [
+        { code: { $regex: 'FINISH', $options: 'i' } },
+        { name: { $regex: 'FINISH', $options: 'i' } },
+        { code: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'THANH', $options: 'i' } },
+        { name: { $regex: 'PHAM', $options: 'i' } },
+        { name: { $regex: 'THÀNH', $options: 'i' } }
+      ]
+    });
+  }
+
+  if (finishedLocation && qtyNum !== 0) {
+    const balanceFilter = {
+      location_id: finishedLocation._id,
+      item_id: orderLine.item_id,
+      lot_id: lot_id || null
+    };
+
+    let balance = await InventoryBalance.findOne(balanceFilter);
+    if (!balance) {
+      balance = await InventoryBalance.create({
+        location_id: finishedLocation._id,
+        item_id: orderLine.item_id,
+        lot_id: lot_id || null,
+        qty_on_hand: 0,
+        qty_reserved: 0
+      });
+    }
+
+    balance.qty_on_hand += qtyNum;
+    balance.updated_at = new Date();
+    await balance.save();
+
+    await InventoryTransaction.create({
+      txn_time: new Date(),
+      location_id: finishedLocation._id,
+      item_id: orderLine.item_id,
+      lot_id: lot_id || null,
+      qty: qtyNum,
+      uom_id,
+      txn_type: 'PRODUCTION_IN',
+      ref_type: 'PRODUCTION_ORDER',
+      // Use the created ProductionOutputLot id for idempotency when backfilling.
+      ref_id: output._id,
+      created_by: req.user.id,
+      notes: `Auto-receipt from production output (${orderLineWithOrder?.prod_order_id?.prod_order_no || orderLineWithOrder?.prod_order_id?._id || 'PO'})`
+    });
+  }
+
   // Update actual quantity
-  orderLine.actual_qty += qty;
+  orderLine.actual_qty += qtyNum;
   await orderLine.save();
 
   const populatedOutput = await ProductionOutputLot.findById(output._id)

@@ -183,6 +183,22 @@ exports.updateRouteStatus = asyncHandler(async (req, res) => {
         );
     }
 
+    // DRIVER: chỉ được cập nhật route được phân cho họ
+    const roles = req.user?.roles || [];
+    const isDriverOnly = roles.includes('DRIVER') && !(
+        roles.includes('ADMIN') ||
+        roles.includes('MANAGER') ||
+        roles.includes('CHEF') ||
+        roles.includes('SUPPLY_COORDINATOR')
+    );
+    if (isDriverOnly) {
+        const user = await AppUser.findById(req.user.id).select('full_name username');
+        const driverName = user?.full_name || user?.username;
+        if (route.driver_name !== driverName) {
+            return res.status(403).json(ApiResponse.error('Access denied', 403));
+        }
+    }
+
     route.status = status;
 
     // Set actual times based on status
@@ -325,6 +341,22 @@ exports.updateStopStatus = asyncHandler(async (req, res) => {
         );
     }
 
+    // DRIVER: chỉ được cập nhật stop thuộc route được phân cho họ
+    const roles = req.user?.roles || [];
+    const isDriverOnly = roles.includes('DRIVER') && !(
+        roles.includes('ADMIN') ||
+        roles.includes('MANAGER') ||
+        roles.includes('CHEF') ||
+        roles.includes('SUPPLY_COORDINATOR')
+    );
+    if (isDriverOnly) {
+        const user = await AppUser.findById(req.user.id).select('full_name username');
+        const driverName = user?.full_name || user?.username;
+        if (route.driver_name !== driverName) {
+            return res.status(403).json(ApiResponse.error('Access denied', 403));
+        }
+    }
+
     const stop = await RouteStop.findById(req.params.stopId);
 
     if (!stop) {
@@ -359,7 +391,8 @@ exports.updateStopStatus = asyncHandler(async (req, res) => {
 
     // Handle delivery photo upload
     if (status === 'COMPLETED' && req.file) {
-        stop.delivery_photo_url = req.file.path;
+        // multer-storage-cloudinary thường trả URL qua secure_url/url thay vì path
+        stop.delivery_photo_url = req.file.secure_url || req.file.url || req.file.path;
         stop.delivery_photo_uploaded_at = new Date();
     }
 

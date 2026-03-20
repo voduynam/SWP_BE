@@ -2,6 +2,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const ConsolidatedOrderSummary = require('../models/ConsolidatedOrderSummary');
 const InternalOrder = require('../models/InternalOrder');
 const InternalOrderLine = require('../models/InternalOrderLine');
+const ProductionOrder = require('../models/ProductionOrder');
+const Shipment = require('../models/Shipment');
 const InventoryBalance = require('../models/InventoryBalance');
 const ApiResponse = require('../utils/ApiResponse');
 
@@ -49,9 +51,12 @@ exports.generateConsolidatedSummary = asyncHandler(async (req, res) => {
 
     const targetDate = new Date(delivery_date);
 
-    // Find all SUBMITTED or APPROVED orders for the delivery date
+    // Find all eligible internal orders for consolidation:
+    // - Approved/Processing (so Supply coordinator can create shipments)
+    // - Production is DONE (so shipment creation is allowed)
+    // - Not already shipped (exclude cancelled shipments only)
     const orders = await InternalOrder.find({
-        status: { $in: ['SUBMITTED', 'APPROVED'] },
+        status: { $in: ['APPROVED', 'PROCESSING'] },
         order_date: { $lte: targetDate }
     });
 
@@ -61,10 +66,41 @@ exports.generateConsolidatedSummary = asyncHandler(async (req, res) => {
         );
     }
 
-    // Get all order lines
-    const orderIds = orders.map(o => o._id);
+    const orderIds = orders.map(o => String(o._id));
+
+    const [doneProductionOrders, existingShipments] = await Promise.all([
+        ProductionOrder.find({
+            status: 'DONE',
+            internal_order_id: { $in: orderIds }
+        }).select('internal_order_id'),
+        Shipment.find({
+            order_id: { $in: orderIds },
+            status: { $ne: 'CANCELLED' }
+        }).select('order_id')
+    ]);
+
+    const doneProductionIds = new Set(
+        doneProductionOrders.map(po => String(po.internal_order_id))
+    );
+
+    const shippedOrderIds = new Set(
+        existingShipments.map(s => String(s.order_id))
+    );
+
+    const eligibleOrders = orders.filter(o =>
+        doneProductionIds.has(String(o._id)) && !shippedOrderIds.has(String(o._id))
+    );
+
+    if (eligibleOrders.length === 0) {
+        return res.status(200).json(
+            ApiResponse.success([], 'No eligible orders found for consolidation')
+        );
+    }
+
+    // Get all order lines for eligible orders only
+    const eligibleOrderIds = eligibleOrders.map(o => String(o._id));
     const orderLines = await InternalOrderLine.find({
-        order_id: { $in: orderIds }
+        order_id: { $in: eligibleOrderIds }
     }).populate('item_id').populate('uom_id').populate('order_id');
 
     // Group by item_id
