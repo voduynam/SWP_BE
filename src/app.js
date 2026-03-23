@@ -16,7 +16,23 @@ const { notFound } = require('./middlewares/notFound');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+// Allow Swagger UI CDN assets (cdnjs) while keeping helmet for all other routes
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+  })
+);
 
 // CORS: dùng corsOrigins (CORS_ORIGINS hoặc CLIENT_URL, phân tách bằng dấu phẩy) — không dùng clientUrl đơn lẻ để tránh bỏ sót khi chỉ set CORS_ORIGINS
 app.use(
