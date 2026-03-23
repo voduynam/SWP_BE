@@ -18,11 +18,19 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-app.use(cors({
-  origin: config.clientUrl || '*',
-  credentials: true
-}));
+// CORS: dùng corsOrigins (CORS_ORIGINS hoặc CLIENT_URL, phân tách bằng dấu phẩy) — không dùng clientUrl đơn lẻ để tránh bỏ sót khi chỉ set CORS_ORIGINS
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (config.corsOrigins.includes(origin)) return callback(null, true);
+      callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  })
+);
 
 // Logging middleware
 app.use(morgan('dev'));
@@ -30,6 +38,9 @@ app.use(morgan('dev'));
 // Body parser middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Static: ảnh giao hàng lưu local (uploads/delivery-proof)
+app.use('/uploads', express.static('uploads'));
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -1,14 +1,16 @@
 const { Server } = require('socket.io');
+const config = require('../config/config');
 
 let io;
 
 const initSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: '*',
-            methods: ['GET', 'POST', 'PUT', 'DELETE'],
-            credentials: true
-        }
+            // Không dùng '*' khi credentials: true — phải trùng Origin trình duyệt (giống Express CORS)
+            origin: config.corsOrigins,
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+            credentials: true,
+        },
     });
 
     io.on('connection', (socket) => {
