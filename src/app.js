@@ -58,6 +58,17 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Static: ảnh giao hàng lưu local (uploads/delivery-proof)
 app.use('/uploads', express.static('uploads'));
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Central Kitchen and Franchise Store Management System API',
+    version: '1.0.0',
+    status: 'running',
+    documentation: '/api-docs',
+    apiBase: '/api'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
