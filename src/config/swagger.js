@@ -15,8 +15,8 @@ const options = {
     },
     servers: [
       {
-        url: `http://localhost:${config.port || 3000}`,
-        description: 'Development server'
+        url: '/',
+        description: 'Default server'
       }
     ],
     components: {
