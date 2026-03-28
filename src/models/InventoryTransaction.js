@@ -48,6 +48,14 @@ const inventoryTransactionSchema = new mongoose.Schema({
   },
   notes: {
     type: String
+  },
+  unit_cost: {
+    type: Number,
+    default: 0
+  },
+  total_value: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: false

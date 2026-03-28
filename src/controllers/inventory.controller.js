@@ -77,7 +77,7 @@ exports.getInventoryTransactions = asyncHandler(async (req, res) => {
 
   const transactions = await InventoryTransaction.find(filter)
     .populate('location_id', 'name code')
-    .populate('item_id', 'sku name item_type')
+    .populate('item_id', 'sku name item_type cost_price')
     .populate('lot_id', 'lot_code mfg_date exp_date')
     .populate('uom_id', 'code name')
     .populate('created_by', 'username full_name')
@@ -85,10 +85,20 @@ exports.getInventoryTransactions = asyncHandler(async (req, res) => {
     .limit(limit)
     .sort({ txn_time: -1 });
 
+  // Add calculated cost information for transactions that don't have it
+  const transactionsWithCost = transactions.map(txn => {
+    const txnObj = txn.toObject();
+    if (!txnObj.unit_cost && txnObj.item_id?.cost_price) {
+      txnObj.unit_cost = txnObj.item_id.cost_price;
+      txnObj.total_value = txnObj.unit_cost * Math.abs(txnObj.qty);
+    }
+    return txnObj;
+  });
+
   const total = await InventoryTransaction.countDocuments(filter);
 
   return res.status(200).json(
-    ApiResponse.paginate(transactions, page, limit, total)
+    ApiResponse.paginate(transactionsWithCost, page, limit, total)
   );
 });
 
@@ -152,13 +162,29 @@ exports.getInventorySummary = asyncHandler(async (req, res) => {
 // @route   POST /api/inventory/adjust
 // @access  Private (Manager, Admin)
 exports.adjustInventory = asyncHandler(async (req, res) => {
-  const { location_id, item_id, lot_id, qty, uom_id, reason } = req.body;
+  const { location_id, item_id, lot_id, qty, uom_id, reason, unit_cost } = req.body;
 
   if (!location_id || !item_id || qty === undefined) {
     return res.status(400).json(
       ApiResponse.error('Location, item, and quantity are required', 400)
     );
   }
+
+  // Get item to fetch cost_price if unit_cost not provided
+  const Item = require('../models/Item');
+  const item = await Item.findById(item_id);
+  if (!item) {
+    return res.status(404).json(
+      ApiResponse.error('Item not found', 404)
+    );
+  }
+
+  // Use provided unit_cost or fall back to item's cost_price
+  const finalUnitCost = unit_cost !== undefined && unit_cost !== null 
+    ? unit_cost 
+    : item.cost_price || 0;
+
+  const totalValue = Math.abs(qty) * finalUnitCost;
 
   // Get or create inventory balance
   const balanceFilter = {
@@ -188,7 +214,7 @@ exports.adjustInventory = asyncHandler(async (req, res) => {
   balance.updated_at = new Date();
   await balance.save();
 
-  // Create transaction
+  // Create transaction with cost information
   const transaction = await InventoryTransaction.create({
     txn_time: new Date(),
     location_id,
@@ -199,16 +225,27 @@ exports.adjustInventory = asyncHandler(async (req, res) => {
     txn_type: 'ADJUSTMENT',
     ref_type: 'ADJUSTMENT',
     created_by: req.user.id,
-    notes: reason
+    notes: reason,
+    unit_cost: finalUnitCost,
+    total_value: qty > 0 ? totalValue : -totalValue // Negative for outbound
   });
 
   const populatedTransaction = await InventoryTransaction.findById(transaction._id)
     .populate('location_id', 'name code')
-    .populate('item_id', 'sku name')
+    .populate('item_id', 'sku name cost_price')
     .populate('lot_id', 'lot_code')
-    .populate('uom_id', 'code name');
+    .populate('uom_id', 'code name')
+    .populate('created_by', 'username full_name');
 
   return res.status(201).json(
-    ApiResponse.success(populatedTransaction, 'Inventory adjusted successfully', 201)
+    ApiResponse.success({
+      ...populatedTransaction.toObject(),
+      cost_summary: {
+        unit_cost: finalUnitCost,
+        quantity: qty,
+        total_value: qty > 0 ? totalValue : -totalValue,
+        currency: 'VND'
+      }
+    }, 'Inventory adjusted successfully with cost tracking', 201)
   );
 });
