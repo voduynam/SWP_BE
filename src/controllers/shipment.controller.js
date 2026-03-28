@@ -624,12 +624,31 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
     );
   }
 
+  // Handle evidence photos/videos for issues
+  let evidenceFiles = [];
+  if (req.files && req.files.length > 0) {
+    evidenceFiles = req.files.map(file => ({
+      url: file.secure_url || file.url || file.path,
+      type: file.mimetype.startsWith('video/') ? 'video' : 'image',
+      filename: file.filename || file.originalname,
+      uploaded_at: new Date()
+    }));
+  }
+
+  // Require evidence files for RECEIVED_WITH_ISSUES and NOT_RECEIVED
+  if ((receipt_status === 'RECEIVED_WITH_ISSUES' || receipt_status === 'NOT_RECEIVED') && evidenceFiles.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('Evidence photos/videos are required when reporting issues or non-receipt', 400)
+    );
+  }
+
   // Update shipment with receipt confirmation
   shipment.received_by_staff = req.user.id;
   shipment.received_at = new Date();
   shipment.receipt_status = receipt_status;
   shipment.receipt_notes = receipt_notes || '';
   shipment.delivery_discrepancy = delivery_discrepancy || '';
+  shipment.receipt_evidence_photos = evidenceFiles;
   await shipment.save();
 
   // Update internal order status based on receipt confirmation
@@ -660,7 +679,7 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
     await notificationController.createNotificationInternal({
       recipient_role: 'MANAGER',
       title: 'Nhận hàng có vấn đề',
-      message: `Nhân viên báo cáo vấn đề khi nhận hàng ${shipment.shipment_no}: ${delivery_discrepancy}`,
+      message: `Nhân viên báo cáo vấn đề khi nhận hàng ${shipment.shipment_no}: ${delivery_discrepancy}. Có ${evidenceFiles.length} file bằng chứng.`,
       type: 'URGENT',
       ref_type: 'SHIPMENT',
       ref_id: shipment._id
@@ -669,7 +688,7 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
     await notificationController.createNotificationInternal({
       recipient_role: 'MANAGER',
       title: 'Chưa nhận được hàng',
-      message: `Nhân viên xác nhận CHƯA nhận được hàng ${shipment.shipment_no}. Cần kiểm tra ngay!`,
+      message: `Nhân viên xác nhận CHƯA nhận được hàng ${shipment.shipment_no}. Có ${evidenceFiles.length} file bằng chứng. Cần kiểm tra ngay!`,
       type: 'URGENT',
       ref_type: 'SHIPMENT',
       ref_id: shipment._id
@@ -682,7 +701,11 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
     .populate('to_location_id', 'name code');
 
   return res.status(200).json(
-    ApiResponse.success(populatedShipment, 'Receipt confirmation recorded successfully')
+    ApiResponse.success({
+      ...populatedShipment.toObject(),
+      evidence_files_count: evidenceFiles.length,
+      evidence_files: evidenceFiles
+    }, 'Receipt confirmation recorded successfully')
   );
 });
 

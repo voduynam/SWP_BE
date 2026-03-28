@@ -58,21 +58,33 @@
 - `src/controllers/shipment.controller.js` - Thêm `confirmReceipt` function (+89 lines)
 - `src/models/Shipment.js` - Thêm receipt confirmation fields (+25 lines)
 - `src/routes/shipment.routes.js` - Thêm confirm-receipt endpoint (+20 lines)
+- `src/middlewares/uploadReceiptEvidence.js` - NEW: Evidence upload middleware (+45 lines)
 
 **Features:**
 - ✅ **3 trạng thái xác nhận**: RECEIVED_OK, RECEIVED_WITH_ISSUES, NOT_RECEIVED
 - ✅ **Ghi chú chi tiết**: Staff có thể ghi chú về tình trạng hàng nhận
 - ✅ **Báo cáo sự cố**: Mô tả chi tiết vấn đề nếu có (delivery_discrepancy)
+- ✅ **🆕 Evidence Photos/Videos**: Upload ảnh + video bằng chứng khi có vấn đề
 - ✅ **Cập nhật trạng thái đơn hàng**: Tự động cập nhật InternalOrder status
 - ✅ **Kiểm soát quyền truy cập**: Chỉ STORE_STAFF, MANAGER, ADMIN được xác nhận
+
+**🎥 Video Support:**
+- ✅ **Formats hỗ trợ**: MP4, MOV, AVI, MKV, WEBM
+- ✅ **Image formats**: JPEG, JPG, PNG, WEBP, GIF
+- ✅ **File size limit**: 50MB per file (để hỗ trợ video)
+- ✅ **Max files**: 5 files (ảnh + video combined)
+- ✅ **Cloudinary integration**: Tự động upload lên cloud storage
+- ✅ **Metadata tracking**: Lưu trữ type (image/video), filename, upload time
 
 **API Endpoint:**
 ```
 PUT /api/shipments/{id}/confirm-receipt
+Content-Type: multipart/form-data
 Body: {
   "receipt_status": "RECEIVED_OK|RECEIVED_WITH_ISSUES|NOT_RECEIVED",
   "receipt_notes": "Ghi chú về tình trạng hàng",
-  "delivery_discrepancy": "Mô tả vấn đề nếu có"
+  "delivery_discrepancy": "Mô tả vấn đề nếu có",
+  "evidence_photos": [File1, File2, ...] // Ảnh/Video bằng chứng
 }
 ```
 
@@ -124,26 +136,30 @@ PUT /api/shipments/ship_xxx/confirm-receipt {
 → ✅ Thông báo Manager: "Xác nhận nhận hàng thành công"
 ```
 
-**Test Scenario 2: Staff báo cáo có vấn đề**
+**Test Scenario 2: Staff báo cáo có vấn đề + Upload video bằng chứng**
 ```bash
 PUT /api/shipments/ship_xxx/confirm-receipt {
   "receipt_status": "RECEIVED_WITH_ISSUES",
   "receipt_notes": "Nhận hàng nhưng có vấn đề",
-  "delivery_discrepancy": "Thiếu 2 sản phẩm, 1 sản phẩm bị hỏng"
+  "delivery_discrepancy": "Thiếu 2 sản phẩm, 1 sản phẩm bị hỏng",
+  "evidence_photos": [video1.mp4, photo1.jpg, photo2.png]
 }
 → ✅ InternalOrder status = RECEIVED (nhưng có ghi chú)
-→ ✅ Thông báo URGENT Manager: "Nhận hàng có vấn đề"
+→ ✅ Thông báo URGENT Manager: "Nhận hàng có vấn đề - Có 3 file bằng chứng"
+→ ✅ Files upload lên Cloudinary với metadata đầy đủ
 ```
 
-**Test Scenario 3: Staff báo chưa nhận được hàng**
+**Test Scenario 3: Staff báo chưa nhận được hàng + Upload video bằng chứng**
 ```bash
 PUT /api/shipments/ship_xxx/confirm-receipt {
   "receipt_status": "NOT_RECEIVED",
   "receipt_notes": "Chưa nhận được hàng",
-  "delivery_discrepancy": "Tài xế nói đã giao nhưng tôi không thấy hàng đâu"
+  "delivery_discrepancy": "Tài xế nói đã giao nhưng tôi không thấy hàng đâu",
+  "evidence_photos": [video_proof.mp4, location_photo.jpg]
 }
 → ✅ InternalOrder status giữ nguyên SHIPPED
-→ ✅ Thông báo URGENT Manager: "CHƯA nhận được hàng - Cần kiểm tra ngay!"
+→ ✅ Thông báo URGENT Manager: "CHƯA nhận được hàng - Có 2 file bằng chứng - Cần kiểm tra ngay!"
+→ ✅ Video evidence giúp Manager điều tra chính xác
 ```
 
 **Test Scenario 4: Automated Notifications**

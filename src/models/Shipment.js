@@ -82,6 +82,20 @@ const shipmentSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Evidence photos/videos for receipt issues
+  receipt_evidence_photos: [{
+    url: String,
+    type: {
+      type: String,
+      enum: ['image', 'video'],
+      default: 'image'
+    },
+    filename: String,
+    uploaded_at: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   // Notification tracking
   staff_notified_at: {
     type: Date,

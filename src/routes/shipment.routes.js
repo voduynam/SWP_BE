@@ -3,6 +3,7 @@ const router = express.Router();
 const shipmentController = require('../controllers/shipment.controller');
 const { protect, authorize } = require('../middlewares/auth');
 const upload = require('../middlewares/uploadDeliveryImage');
+const uploadReceiptEvidence = require('../middlewares/uploadReceiptEvidence');
 
 /**
  * @swagger
@@ -345,6 +346,17 @@ router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
  *   put:
  *     summary: Staff confirm receipt of shipment
  *     tags: [Shipments]
+ *     description: |
+ *       Staff xác nhận đã nhận hàng từ shipment.
+ *       
+ *       Khi báo cáo có vấn đề (RECEIVED_WITH_ISSUES) hoặc chưa nhận được hàng (NOT_RECEIVED),
+ *       PHẢI upload ảnh/video bằng chứng.
+ *       
+ *       Hỗ trợ formats:
+ *       - Images: JPEG, JPG, PNG, WEBP, GIF
+ *       - Videos: MP4, MOV, AVI, MKV, WEBM
+ *       - Max file size: 50MB
+ *       - Max files: 5 files
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -357,9 +369,11 @@ router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - receipt_status
  *             properties:
  *               receipt_status:
  *                 type: string
@@ -371,10 +385,18 @@ router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
  *               delivery_discrepancy:
  *                 type: string
  *                 description: Description of any issues or discrepancies
+ *               evidence_photos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Evidence photos/videos (REQUIRED for RECEIVED_WITH_ISSUES and NOT_RECEIVED). Supports images (JPEG, PNG, WEBP) and videos (MP4, MOV, AVI, MKV, WEBM). Max 50MB per file, max 5 files total.
  *     responses:
  *       200:
  *         description: Receipt confirmed successfully
+ *       400:
+ *         description: Bad request - Evidence photos/videos required for issues
  */
-router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), shipmentController.confirmReceipt);
+router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), uploadReceiptEvidence.array('evidence_photos', 5), shipmentController.confirmReceipt);
 
 module.exports = router;
