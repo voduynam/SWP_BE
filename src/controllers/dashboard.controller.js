@@ -511,3 +511,324 @@ exports.getProfitStatistics = asyncHandler(async (req, res) => {
     })
   );
 });
+// @desc    Get expiry alerts for dashboard
+// @route   GET /api/dashboard/expiry-alerts
+// @access  Private
+exports.getExpiryAlerts = asyncHandler(async (req, res) => {
+  const { location_id } = req.query;
+  const today = new Date();
+  const nearExpiryDate = new Date();
+  nearExpiryDate.setDate(today.getDate() + 7);
+
+  const Lot = require('../models/Lot');
+  const InventoryBalance = require('../models/InventoryBalance');
+
+  // Build match conditions
+  const matchConditions = {};
+  if (location_id) {
+    matchConditions['inventory.location_id'] = location_id;
+  }
+
+  const pipeline = [
+    {
+      $lookup: {
+        from: 'inventory_balance',
+        localField: '_id',
+        foreignField: 'lot_id',
+        as: 'inventory'
+      }
+    },
+    {
+      $unwind: { path: '$inventory', preserveNullAndEmptyArrays: true }
+    },
+    {
+      $lookup: {
+        from: 'item',
+        localField: 'item_id',
+        foreignField: '_id',
+        as: 'item'
+      }
+    },
+    {
+      $unwind: '$item'
+    },
+    {
+      $match: matchConditions
+    },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        total_quantity: { $sum: '$inventory.qty_on_hand' },
+        total_value: { 
+          $sum: { 
+            $multiply: ['$inventory.qty_on_hand', '$item.cost_price'] 
+          } 
+        }
+      }
+    }
+  ];
+
+  const statusSummary = await Lot.aggregate(pipeline);
+
+  // Get specific alerts
+  const nearExpiryCount = await Lot.countDocuments({
+    exp_date: { $lte: nearExpiryDate, $gt: today },
+    status: { $in: ['ACTIVE', 'NEAR_EXPIRY'] }
+  });
+
+  const expiredCount = await Lot.countDocuments({
+    status: 'EXPIRED'
+  });
+
+  const disposalPendingCount = await Lot.countDocuments({
+    status: 'EXPIRED',
+    disposal_status: { $ne: 'DISPOSED' }
+  });
+
+  return res.status(200).json(
+    ApiResponse.success({
+      status_summary: statusSummary,
+      alerts: {
+        near_expiry_count: nearExpiryCount,
+        expired_count: expiredCount,
+        disposal_pending: disposalPendingCount,
+        total_alerts: nearExpiryCount + expiredCount
+      }
+    })
+  );
+});
+
+// @desc    Get waste metrics for dashboard
+// @route   GET /api/dashboard/waste-metrics
+// @access  Private
+exports.getWasteMetrics = asyncHandler(async (req, res) => {
+  const { location_id } = req.query;
+  const WasteTransaction = require('../models/WasteTransaction');
+  
+  const today = new Date();
+  const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+
+  const matchConditions = {};
+  if (location_id) {
+    matchConditions.location_id = location_id;
+  }
+
+  // Current month waste
+  const currentMonthPipeline = [
+    {
+      $match: {
+        ...matchConditions,
+        transaction_date: { $gte: thisMonth }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total_value: { $sum: '$total_waste_value' },
+        total_quantity: { $sum: '$quantity_wasted' },
+        transaction_count: { $sum: 1 }
+      }
+    }
+  ];
+
+  // Last month waste for comparison
+  const lastMonthPipeline = [
+    {
+      $match: {
+        ...matchConditions,
+        transaction_date: { $gte: lastMonth, $lte: lastMonthEnd }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total_value: { $sum: '$total_waste_value' },
+        total_quantity: { $sum: '$quantity_wasted' },
+        transaction_count: { $sum: 1 }
+      }
+    }
+  ];
+
+  // Waste by category this month
+  const categoryPipeline = [
+    {
+      $match: {
+        ...matchConditions,
+        transaction_date: { $gte: thisMonth }
+      }
+    },
+    {
+      $group: {
+        _id: '$waste_type',
+        total_value: { $sum: '$total_waste_value' },
+        count: { $sum: 1 }
+      }
+    },
+    { $sort: { total_value: -1 } }
+  ];
+
+  const [currentMonth, lastMonthData, categoryData] = await Promise.all([
+    WasteTransaction.aggregate(currentMonthPipeline),
+    WasteTransaction.aggregate(lastMonthPipeline),
+    WasteTransaction.aggregate(categoryPipeline)
+  ]);
+
+  const currentMonthWaste = currentMonth.length > 0 ? currentMonth[0] : {
+    total_value: 0,
+    total_quantity: 0,
+    transaction_count: 0
+  };
+
+  const lastMonthWaste = lastMonthData.length > 0 ? lastMonthData[0] : {
+    total_value: 0,
+    total_quantity: 0,
+    transaction_count: 0
+  };
+
+  // Calculate trend
+  let wasteTrend = 'STABLE';
+  let trendPercentage = 0;
+
+  if (lastMonthWaste.total_value > 0) {
+    trendPercentage = ((currentMonthWaste.total_value - lastMonthWaste.total_value) / lastMonthWaste.total_value * 100);
+    if (trendPercentage > 5) {
+      wasteTrend = 'INCREASING';
+    } else if (trendPercentage < -5) {
+      wasteTrend = 'DECREASING';
+    }
+  } else if (currentMonthWaste.total_value > 0) {
+    wasteTrend = 'INCREASING';
+    trendPercentage = 100;
+  }
+
+  return res.status(200).json(
+    ApiResponse.success({
+      current_month: currentMonthWaste,
+      last_month: lastMonthWaste,
+      trend: {
+        direction: wasteTrend,
+        percentage: Math.abs(trendPercentage).toFixed(2)
+      },
+      categories: categoryData
+    })
+  );
+});
+
+// @desc    Get cost savings metrics
+// @route   GET /api/dashboard/cost-savings
+// @access  Private
+exports.getCostSavings = asyncHandler(async (req, res) => {
+  const { location_id } = req.query;
+  const WasteTransaction = require('../models/WasteTransaction');
+  const ReturnRequest = require('../models/ReturnRequest');
+  
+  const today = new Date();
+  const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  const matchConditions = {};
+  if (location_id) {
+    matchConditions.location_id = location_id;
+  }
+
+  // Prevented waste through return replacements
+  const preventedWastePipeline = [
+    {
+      $match: {
+        ...matchConditions,
+        waste_type: 'RETURN_REPLACEMENT',
+        transaction_date: { $gte: thisMonth }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        prevented_waste_value: { $sum: '$total_waste_value' },
+        replacement_count: { $sum: 1 }
+      }
+    }
+  ];
+
+  // Early disposal savings (disposed before complete expiry)
+  const earlyDisposalPipeline = [
+    {
+      $match: {
+        ...matchConditions,
+        waste_type: 'EXPIRED_MATERIAL',
+        transaction_date: { $gte: thisMonth }
+      }
+    },
+    {
+      $lookup: {
+        from: 'lot',
+        localField: 'lot_id',
+        foreignField: '_id',
+        as: 'lot'
+      }
+    },
+    {
+      $unwind: '$lot'
+    },
+    {
+      $addFields: {
+        days_past_expiry: {
+          $divide: [
+            { $subtract: ['$transaction_date', '$lot.exp_date'] },
+            1000 * 60 * 60 * 24
+          ]
+        }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        early_disposal_count: {
+          $sum: {
+            $cond: [{ $lte: ['$days_past_expiry', 1] }, 1, 0]
+          }
+        },
+        late_disposal_count: {
+          $sum: {
+            $cond: [{ $gt: ['$days_past_expiry', 1] }, 1, 0]
+          }
+        },
+        total_disposal_value: { $sum: '$total_waste_value' }
+      }
+    }
+  ];
+
+  const [preventedWaste, disposalMetrics] = await Promise.all([
+    WasteTransaction.aggregate(preventedWastePipeline),
+    WasteTransaction.aggregate(earlyDisposalPipeline)
+  ]);
+
+  const preventedWasteData = preventedWaste.length > 0 ? preventedWaste[0] : {
+    prevented_waste_value: 0,
+    replacement_count: 0
+  };
+
+  const disposalData = disposalMetrics.length > 0 ? disposalMetrics[0] : {
+    early_disposal_count: 0,
+    late_disposal_count: 0,
+    total_disposal_value: 0
+  };
+
+  // Calculate efficiency metrics
+  const totalDisposals = disposalData.early_disposal_count + disposalData.late_disposal_count;
+  const disposalEfficiency = totalDisposals > 0 
+    ? (disposalData.early_disposal_count / totalDisposals * 100).toFixed(2)
+    : 0;
+
+  return res.status(200).json(
+    ApiResponse.success({
+      prevented_waste: preventedWasteData,
+      disposal_metrics: disposalData,
+      efficiency: {
+        disposal_efficiency_percentage: disposalEfficiency,
+        total_cost_impact: preventedWasteData.prevented_waste_value + disposalData.total_disposal_value
+      }
+    })
+  );
+});

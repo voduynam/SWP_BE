@@ -15,6 +15,27 @@ const productionOrderSchema = new mongoose.Schema({
     default: null,
     ref: 'InternalOrder'
   },
+  compensating_for_order_id: {
+    type: String,
+    default: null,
+    ref: 'ProductionOrder'
+  },
+  is_compensating_order: {
+    type: Boolean,
+    default: false
+  },
+  estimated_material_cost: {
+    type: Number,
+    default: 0
+  },
+  actual_material_cost: {
+    type: Number,
+    default: 0
+  },
+  cost_variance: {
+    type: Number,
+    default: 0
+  },
   planned_start: {
     type: Date,
     required: true

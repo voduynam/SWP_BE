@@ -30,7 +30,7 @@ const notificationSchema = new mongoose.Schema({
     },
     ref_type: {
         type: String,
-        enum: ['ORDER', 'SHIPMENT', 'PRODUCTION', 'EXCEPTION', 'DELIVERY_ROUTE', 'ROUTE_STOP', 'RETURN_REQUEST', 'OTHER'],
+        enum: ['ORDER', 'SHIPMENT', 'PRODUCTION', 'EXCEPTION', 'DELIVERY_ROUTE', 'ROUTE_STOP', 'RETURN_REQUEST', 'BATCH_UPDATE', 'OTHER'],
         default: 'OTHER'
     },
     ref_id: {

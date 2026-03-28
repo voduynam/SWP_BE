@@ -14,6 +14,9 @@ const recipeRoutes = require('./recipe.routes');
 const lotRoutes = require('./lot.routes');
 const masterDataRoutes = require('./masterData.routes');
 const returnRequestRoutes = require('./returnRequest.routes');
+const materialRequestRoutes = require('./materialRequest.routes');
+const productionVarianceCostRoutes = require('./productionVarianceCost.routes');
+const wasteReportRoutes = require('./wasteReport.routes');
 const alertRoutes = require('./alert.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const deliveryRouteRoutes = require('./deliveryRoute.routes');
@@ -37,6 +40,9 @@ router.use('/recipes', recipeRoutes);
 router.use('/lots', lotRoutes);
 router.use('/master-data', masterDataRoutes);
 router.use('/return-requests', returnRequestRoutes);
+router.use('/material-requests', materialRequestRoutes);
+router.use('/production-variance-costs', productionVarianceCostRoutes);
+router.use('/waste-reports', wasteReportRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/delivery-routes', deliveryRouteRoutes);
@@ -65,6 +71,9 @@ router.get('/', (req, res) => {
       lots: '/api/lots',
       'master-data': '/api/master-data',
       'return-requests': '/api/return-requests',
+      'material-requests': '/api/material-requests',
+      'production-variance-costs': '/api/production-variance-costs',
+      'waste-reports': '/api/waste-reports',
       alerts: '/api/alerts',
       dashboard: '/api/dashboard',
       'delivery-routes': '/api/delivery-routes',

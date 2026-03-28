@@ -6,6 +6,7 @@ const InventoryBalance = require('../models/InventoryBalance');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const InternalOrder = require('../models/InternalOrder');
 const InternalOrderLine = require('../models/InternalOrderLine');
+const WasteTransaction = require('../models/WasteTransaction');
 const Item = require('../models/Item');
 const Recipe = require('../models/Recipe');
 const RecipeLine = require('../models/RecipeLine');
@@ -269,6 +270,32 @@ exports.reviewReturnRequest = asyncHandler(async (req, res) => {
         ref_type: 'ORDER',
         ref_id: replacementOrder._id
       });
+
+      // Create waste transaction for replacement materials
+      const returnLines = await ReturnRequestLine.find({ 
+        return_request_id: returnRequest._id 
+      }).populate('item_id').populate('uom_id');
+
+      for (const line of returnLines) {
+        const wasteValue = (line.item_id.cost_price || 0) * line.qty_return;
+        
+        await WasteTransaction.create({
+          _id: `waste_replacement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          waste_type: 'RETURN_REPLACEMENT',
+          reference_type: 'RETURN_REQUEST',
+          reference_id: returnRequest._id,
+          item_id: line.item_id._id,
+          lot_id: line.lot_id || null,
+          quantity_wasted: line.qty_return,
+          uom_id: line.uom_id,
+          unit_cost: line.item_id.cost_price || 0,
+          total_waste_value: wasteValue,
+          location_id: returnRequest.store_org_unit_id,
+          reason: `Replacement materials for return: ${line.reason}`,
+          notes: `Original return request: ${returnRequest.return_no}`,
+          created_by: req.user.id
+        });
+      }
 
     } catch (error) {
       console.error('Error creating replacement order:', error);

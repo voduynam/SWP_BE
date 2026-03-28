@@ -45,13 +45,35 @@ exports.getRecipe = asyncHandler(async (req, res) => {
   }
 
   const recipeLines = await RecipeLine.find({ recipe_id: recipe._id })
-    .populate('material_item_id', 'sku name item_type')
+    .populate('material_item_id', 'sku name item_type cost_price base_sell_price')
     .populate('uom_id', 'code name');
+
+  // Calculate material cost for each recipe line
+  const enrichedRecipeLines = recipeLines.map(line => {
+    const materialCost = (line.material_item_id?.cost_price || 0) * (line.qty_per_batch || 0);
+    return {
+      ...line.toObject(),
+      material_cost: materialCost,
+      material_cost_formatted: `${materialCost.toLocaleString()} VND`
+    };
+  });
+
+  // Calculate total recipe cost
+  const totalRecipeCost = enrichedRecipeLines.reduce((sum, line) => sum + (line.material_cost || 0), 0);
 
   return res.status(200).json(
     ApiResponse.success({
       ...recipe.toObject(),
-      lines: recipeLines
+      lines: enrichedRecipeLines,
+      cost_analysis: {
+        total_recipe_cost: totalRecipeCost,
+        total_recipe_cost_formatted: `${totalRecipeCost.toLocaleString()} VND`,
+        cost_per_unit: totalRecipeCost,
+        currency: 'VND',
+        lines_count: enrichedRecipeLines.length,
+        materials_with_cost: enrichedRecipeLines.filter(line => (line.material_item_id?.cost_price || 0) > 0).length,
+        materials_without_cost: enrichedRecipeLines.filter(line => (line.material_item_id?.cost_price || 0) === 0).length
+      }
     })
   );
 });
@@ -238,7 +260,7 @@ exports.addRecipeLine = asyncHandler(async (req, res) => {
   });
 
   const populatedLine = await RecipeLine.findById(recipeLine._id)
-    .populate('material_item_id', 'sku name item_type')
+    .populate('material_item_id', 'sku name item_type cost_price')
     .populate('uom_id', 'code name');
 
   return res.status(201).json(

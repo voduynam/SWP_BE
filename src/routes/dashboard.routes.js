@@ -122,3 +122,59 @@ router.get('/shipments', dashboardController.getShipmentStatistics);
 router.get('/profit', dashboardController.getProfitStatistics);
 
 module.exports = router;
+/**
+ * @swagger
+ * /api/dashboard/expiry-alerts:
+ *   get:
+ *     summary: Get expiry alerts for dashboard
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: location_id
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Expiry alerts and status summary
+ */
+router.get('/expiry-alerts', dashboardController.getExpiryAlerts);
+
+/**
+ * @swagger
+ * /api/dashboard/waste-metrics:
+ *   get:
+ *     summary: Get waste metrics for dashboard
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: location_id
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Waste metrics with trends and categories
+ */
+router.get('/waste-metrics', dashboardController.getWasteMetrics);
+
+/**
+ * @swagger
+ * /api/dashboard/cost-savings:
+ *   get:
+ *     summary: Get cost savings metrics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: location_id
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Cost savings and efficiency metrics
+ */
+router.get('/cost-savings', dashboardController.getCostSavings);

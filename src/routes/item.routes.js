@@ -34,7 +34,7 @@ const { protect, authorize } = require('../middlewares/auth');
  *         name:
  *           type: string
  *           description: Product name
- *           example: "Sản phẩm A"
+ *           example: "Bánh Trung Thu Nhân Đậu Xanh"
  *         item_type:
  *           type: string
  *           enum: [RAW, FINISHED]
@@ -62,12 +62,12 @@ const { protect, authorize } = require('../middlewares/auth');
  *           example: 365
  *         cost_price:
  *           type: number
- *           description: Cost price (purchase price)
+ *           description: Cost price (purchase price for materials)
  *           default: 0
  *           example: 50000
  *         base_sell_price:
  *           type: number
- *           description: Base selling price
+ *           description: Base selling price (for finished products)
  *           default: 0
  *           example: 75000
  *         status:
@@ -76,62 +76,69 @@ const { protect, authorize } = require('../middlewares/auth');
  *           description: Item status
  *           default: ACTIVE
  *           example: "ACTIVE"
- *       example:
- *         _id: "item_1710241234567"
- *         sku: "PRD-001"
- *         name: "Sản phẩm A"
- *         item_type: "FINISHED"
- *         base_uom_id: "uom_kg"
- *         category_id: "cat_001"
- *         tracking_type: "LOT_EXPIRY"
- *         shelf_life_days: 365
- *         cost_price: 50000
- *         base_sell_price: 75000
- *         status: "ACTIVE"
  */
 
 // All routes require authentication
 router.use(protect);
 
+// ==========================================
+// CRUD OPERATIONS
+// ==========================================
+
 /**
  * @swagger
  * /api/items:
  *   get:
- *     summary: Get all items
+ *     summary: Get all items (materials and finished products)
  *     tags: [Items]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: item_type
+ *         schema:
+ *           type: string
+ *           enum: [RAW, FINISHED]
+ *         description: Filter by item type
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVE, INACTIVE]
+ *         description: Filter by status
+ *       - in: query
+ *         name: category_id
+ *         schema:
+ *           type: string
+ *         description: Filter by category
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name or SKU
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
  *     responses:
  *       200:
- *         description: List of items
+ *         description: List of items with pagination
  */
 router.get('/', itemController.getItems);
 
 /**
  * @swagger
- * /api/items/{id}:
- *   get:
- *     summary: Get single item
- *     tags: [Items]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Item details
- */
-router.get('/:id', itemController.getItem);
-
-/**
- * @swagger
  * /api/items:
  *   post:
- *     summary: Create item
+ *     summary: Create new item (material or finished product)
  *     tags: [Items]
  *     security:
  *       - bearerAuth: []
@@ -141,17 +148,42 @@ router.get('/:id', itemController.getItem);
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/Item'
+ *           examples:
+ *             material:
+ *               summary: Raw Material Example
+ *               value:
+ *                 sku: "RM-001"
+ *                 name: "Bột mì"
+ *                 item_type: "RAW"
+ *                 base_uom_id: "uom_kg"
+ *                 category_id: "cat_ingredients"
+ *                 tracking_type: "NONE"
+ *                 shelf_life_days: 365
+ *                 cost_price: 15000
+ *                 base_sell_price: 0
+ *             finished_product:
+ *               summary: Finished Product Example
+ *               value:
+ *                 sku: "FP-001"
+ *                 name: "Bánh Trung Thu Nhân Đậu Xanh"
+ *                 item_type: "FINISHED"
+ *                 base_uom_id: "uom_unit"
+ *                 category_id: "cat_mooncakes"
+ *                 tracking_type: "LOT_EXPIRY"
+ *                 shelf_life_days: 30
+ *                 cost_price: 0
+ *                 base_sell_price: 50000
  *     responses:
  *       201:
- *         description: Item created
+ *         description: Item created successfully
  */
 router.post('/', authorize('MANAGER', 'ADMIN'), itemController.createItem);
 
 /**
  * @swagger
  * /api/items/{id}:
- *   put:
- *     summary: Update item
+ *   get:
+ *     summary: Get single item by ID
  *     tags: [Items]
  *     security:
  *       - bearerAuth: []
@@ -161,6 +193,30 @@ router.post('/', authorize('MANAGER', 'ADMIN'), itemController.createItem);
  *         required: true
  *         schema:
  *           type: string
+ *         description: Item ID
+ *     responses:
+ *       200:
+ *         description: Item details
+ *       404:
+ *         description: Item not found
+ */
+router.get('/:id', itemController.getItem);
+
+/**
+ * @swagger
+ * /api/items/{id}:
+ *   put:
+ *     summary: Update item (material or finished product)
+ *     tags: [Items]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Item ID
  *     requestBody:
  *       required: true
  *       content:
@@ -169,7 +225,9 @@ router.post('/', authorize('MANAGER', 'ADMIN'), itemController.createItem);
  *             $ref: '#/components/schemas/Item'
  *     responses:
  *       200:
- *         description: Item updated
+ *         description: Item updated successfully
+ *       404:
+ *         description: Item not found
  */
 router.put('/:id', authorize('MANAGER', 'ADMIN'), itemController.updateItem);
 
@@ -177,7 +235,7 @@ router.put('/:id', authorize('MANAGER', 'ADMIN'), itemController.updateItem);
  * @swagger
  * /api/items/{id}:
  *   delete:
- *     summary: Delete item (soft delete)
+ *     summary: Delete item (soft delete - sets status to INACTIVE)
  *     tags: [Items]
  *     security:
  *       - bearerAuth: []
@@ -187,10 +245,102 @@ router.put('/:id', authorize('MANAGER', 'ADMIN'), itemController.updateItem);
  *         required: true
  *         schema:
  *           type: string
+ *         description: Item ID
  *     responses:
  *       200:
- *         description: Item deleted
+ *         description: Item deleted successfully
+ *       404:
+ *         description: Item not found
  */
 router.delete('/:id', authorize('ADMIN'), itemController.deleteItem);
+
+// ==========================================
+// SPECIALIZED OPERATIONS
+// ==========================================
+
+/**
+ * @swagger
+ * /api/items/{id}/cost-price:
+ *   put:
+ *     summary: Update material cost price (Manager only)
+ *     tags: [Items]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Material item ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cost_price:
+ *                 type: number
+ *                 description: New cost price in VND
+ *                 example: 45000
+ *     responses:
+ *       200:
+ *         description: Cost price updated successfully
+ *       400:
+ *         description: Can only update cost price for raw materials
+ */
+router.put('/:id/cost-price', authorize('MANAGER', 'ADMIN'), itemController.updateMaterialCostPrice);
+
+/**
+ * @swagger
+ * /api/items/batch-update-cost-prices:
+ *   put:
+ *     summary: Batch update multiple material cost prices
+ *     tags: [Items]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               updates:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     item_id:
+ *                       type: string
+ *                       description: Material item ID
+ *                     cost_price:
+ *                       type: number
+ *                       description: New cost price in VND
+ *                 example:
+ *                   - item_id: "item_flour"
+ *                     cost_price: 15000
+ *                   - item_id: "item_sugar"
+ *                     cost_price: 12000
+ *     responses:
+ *       200:
+ *         description: Batch update completed
+ */
+router.put('/batch-update-cost-prices', authorize('MANAGER', 'ADMIN'), itemController.batchUpdateMaterialCostPrices);
+
+/**
+ * @swagger
+ * /api/items/materials-without-cost:
+ *   get:
+ *     summary: Get materials without cost prices (for Manager review)
+ *     tags: [Items]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of materials without cost prices
+ */
+router.get('/materials-without-cost', authorize('MANAGER', 'ADMIN'), itemController.getMaterialsWithoutCost);
 
 module.exports = router;

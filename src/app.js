@@ -51,9 +51,17 @@ app.use(
 // Logging middleware
 app.use(morgan('dev'));
 
-// Body parser middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Body parser middleware with UTF-8 support
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Set charset for responses
+app.use((req, res, next) => {
+  res.charset = 'utf-8';
+  next();
+});
 
 // Static: ảnh giao hàng lưu local (uploads/delivery-proof)
 app.use('/uploads', express.static('uploads'));

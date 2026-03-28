@@ -198,4 +198,132 @@ router.post('/:id/consumption', authorize('CHEF', 'MANAGER', 'ADMIN'), productio
  */
 router.post('/:id/output', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.recordOutput);
 
+/**
+ * @swagger
+ * /api/production-orders/{id}/variance-check:
+ *   get:
+ *     summary: Check production variance and suggest compensation
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Production variance analysis
+ */
+router.get('/:id/variance-check', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.checkProductionVariance);
+
+/**
+ * @swagger
+ * /api/production-orders/{id}/compensate:
+ *   post:
+ *     summary: Create compensating production order for shortage
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               shortage_items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     item_id:
+ *                       type: string
+ *                     shortage_qty:
+ *                       type: number
+ *               reason:
+ *                 type: string
+ *               priority:
+ *                 type: string
+ *                 enum: [NORMAL, URGENT]
+ *     responses:
+ *       201:
+ *         description: Compensating production order created
+ */
+router.post('/:id/compensate', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.compensateProductionShortage);
+
+/**
+ * @swagger
+ * /api/production-orders/{id}/execute-compensation:
+ *   post:
+ *     summary: Execute compensating production with automatic material consumption
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Compensating production executed successfully
+ */
+router.post('/:id/execute-compensation', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.executeCompensatingProduction);
+
+/**
+ * @swagger
+ * /api/production-orders/{id}/waste:
+ *   post:
+ *     summary: Record production waste
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               waste_items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     item_id:
+ *                       type: string
+ *                     lot_id:
+ *                       type: string
+ *                     quantity_wasted:
+ *                       type: number
+ *                     uom_id:
+ *                       type: string
+ *                     reason:
+ *                       type: string
+ *                     notes:
+ *                       type: string
+ *                     disposal_method:
+ *                       type: string
+ *                       enum: [TRASH, COMPOST, RETURN_SUPPLIER, RECYCLE, OTHER]
+ *     responses:
+ *       201:
+ *         description: Production waste recorded successfully
+ */
+router.post('/:id/waste', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.recordProductionWaste);
+
 module.exports = router;

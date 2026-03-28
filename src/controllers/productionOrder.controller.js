@@ -485,3 +485,638 @@ exports.recordOutput = asyncHandler(async (req, res) => {
     ApiResponse.success(populatedOutput, 'Output recorded successfully', 201)
   );
 });
+// @desc    Handle production shortage - create compensating production order
+// @route   POST /api/production-orders/:id/compensate
+// @access  Private (Chef, Manager, Admin)
+exports.compensateProductionShortage = asyncHandler(async (req, res) => {
+  const { shortage_items, reason, priority } = req.body;
+
+  if (!shortage_items || shortage_items.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('Shortage items are required', 400)
+    );
+  }
+
+  const originalOrder = await ProductionOrder.findById(req.params.id)
+    .populate('created_by', 'username full_name org_unit_id');
+
+  if (!originalOrder) {
+    return res.status(404).json(
+      ApiResponse.error('Original production order not found', 404)
+    );
+  }
+
+  // Generate compensating production order number
+  const orderCount = await ProductionOrder.countDocuments();
+  const compOrderNo = `PO-COMP-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(orderCount + 1).padStart(2, '0')}`;
+
+  // Check material availability and calculate costs
+  const Recipe = require('../models/Recipe');
+  const RecipeLine = require('../models/RecipeLine');
+  const InventoryBalance = require('../models/InventoryBalance');
+  const Location = require('../models/Location');
+  const Item = require('../models/Item');
+  
+  let totalCompensationCost = 0;
+  const materialRequirements = [];
+  const insufficientMaterials = [];
+
+  // Get kitchen raw material location
+  const orgUnitId = originalOrder.created_by?.org_unit_id?._id || originalOrder.created_by?.org_unit_id;
+  const rawLocation = await Location.findOne({
+    org_unit_id: orgUnitId,
+    $or: [
+      { code: { $regex: 'RAW', $options: 'i' } },
+      { name: { $regex: 'RAW', $options: 'i' } },
+      { name: { $regex: 'NGUYÊN', $options: 'i' } }
+    ]
+  }) || await Location.findOne({
+    $or: [
+      { code: { $regex: 'RAW', $options: 'i' } },
+      { name: { $regex: 'RAW', $options: 'i' } }
+    ]
+  });
+
+  if (!rawLocation) {
+    return res.status(400).json(
+      ApiResponse.error('Raw material location not found', 400)
+    );
+  }
+
+  // Create compensating production order
+  const compensatingOrder = await ProductionOrder.create({
+    _id: `po_comp_${Date.now()}`,
+    prod_order_no: compOrderNo,
+    planned_start: new Date(),
+    planned_end: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+    status: priority === 'URGENT' ? 'RELEASED' : 'PLANNED',
+    created_by: req.user.id,
+    compensating_for_order_id: originalOrder._id,
+    is_compensating_order: true
+  });
+
+  // Create compensating production order lines and check materials
+  const compensatingLines = await Promise.all(
+    shortage_items.map(async (item, index) => {
+      // Get the original line to copy recipe and other details
+      const originalLine = await ProductionOrderLine.findOne({
+        prod_order_id: originalOrder._id,
+        item_id: item.item_id
+      });
+
+      if (!originalLine) {
+        throw new Error(`Original production line not found for item ${item.item_id}`);
+      }
+
+      // Verify recipe is still active
+      const recipe = await Recipe.findById(originalLine.recipe_id);
+      if (!recipe || recipe.status !== 'ACTIVE') {
+        throw new Error(`Recipe ${originalLine.recipe_id} is not active`);
+      }
+
+      // Get recipe lines to check material requirements
+      const recipeLines = await RecipeLine.find({ recipe_id: recipe._id })
+        .populate('material_item_id', 'sku name cost_price')
+        .populate('uom_id', 'code name');
+
+      // Calculate material requirements for this shortage quantity
+      for (const recipeLine of recipeLines) {
+        const requiredQty = (recipeLine.qty_per_batch || 0) * item.shortage_qty;
+        const materialCost = (recipeLine.material_item_id?.cost_price || 0) * requiredQty;
+        totalCompensationCost += materialCost;
+
+        // Check current inventory
+        const currentStock = await InventoryBalance.findOne({
+          location_id: rawLocation._id,
+          item_id: recipeLine.material_item_id._id
+        });
+
+        const availableQty = currentStock?.qty_on_hand || 0;
+        
+        materialRequirements.push({
+          material_item_id: recipeLine.material_item_id._id,
+          material_name: recipeLine.material_item_id.name,
+          required_qty: requiredQty,
+          available_qty: availableQty,
+          unit_cost: recipeLine.material_item_id?.cost_price || 0,
+          total_cost: materialCost,
+          uom_id: recipeLine.uom_id._id,
+          is_sufficient: availableQty >= requiredQty
+        });
+
+        // Track insufficient materials
+        if (availableQty < requiredQty) {
+          insufficientMaterials.push({
+            material_item_id: recipeLine.material_item_id._id,
+            material_name: recipeLine.material_item_id.name,
+            required_qty: requiredQty,
+            available_qty: availableQty,
+            shortage_qty: requiredQty - availableQty,
+            unit_cost: recipeLine.material_item_id?.cost_price || 0,
+            uom_id: recipeLine.uom_id._id
+          });
+        }
+      }
+
+      return await ProductionOrderLine.create({
+        _id: `po_comp_line_${compensatingOrder._id}_${index}`,
+        prod_order_id: compensatingOrder._id,
+        item_id: item.item_id,
+        recipe_id: originalLine.recipe_id,
+        planned_qty: item.shortage_qty,
+        actual_qty: 0,
+        uom_id: originalLine.uom_id
+      });
+    })
+  );
+
+  // Create material request if there are insufficient materials
+  let materialRequestId = null;
+  if (insufficientMaterials.length > 0) {
+    const MaterialRequest = require('../models/MaterialRequest');
+    const MaterialRequestLine = require('../models/MaterialRequestLine');
+    
+    const requestCount = await MaterialRequest.countDocuments();
+    const requestNo = `MR-COMP-${String(requestCount + 1).padStart(4, '0')}`;
+
+    const materialRequest = await MaterialRequest.create({
+      _id: `mr_comp_${Date.now()}`,
+      request_no: requestNo,
+      requested_by: req.user.id,
+      priority: 'URGENT',
+      request_reason: 'PRODUCTION_SHORTAGE_COMPENSATION',
+      production_order_id: compensatingOrder._id,
+      location_id: rawLocation._id,
+      notes: `Material request for compensating production order ${compOrderNo}. Original order: ${originalOrder.prod_order_no}`,
+      expected_delivery: new Date(Date.now() + 12 * 60 * 60 * 1000) // 12 hours
+    });
+
+    await Promise.all(
+      insufficientMaterials.map(async (material, index) => {
+        return await MaterialRequestLine.create({
+          _id: `mr_comp_line_${materialRequest._id}_${index}`,
+          material_request_id: materialRequest._id,
+          item_id: material.material_item_id,
+          quantity_requested: material.shortage_qty,
+          uom_id: material.uom_id,
+          current_stock: material.available_qty,
+          minimum_required: material.shortage_qty,
+          urgency_level: 'URGENT',
+          reason: `Shortage compensation for ${originalOrder.prod_order_no}`,
+          estimated_cost: material.shortage_qty * material.unit_cost
+        });
+      })
+    );
+
+    materialRequestId = materialRequest._id;
+
+    // Notify manager about material shortage
+    try {
+      const { createNotificationInternal } = require('./notification.controller');
+      await createNotificationInternal({
+        recipient_role: 'MANAGER',
+        title: 'URGENT: Material Shortage for Production Compensation',
+        message: `Compensating order ${compOrderNo} requires ${insufficientMaterials.length} materials. Material request ${requestNo} created.`,
+        type: 'URGENT',
+        ref_type: 'MATERIAL_REQUEST',
+        ref_id: materialRequest._id
+      });
+    } catch (error) {
+      console.error('Error creating material shortage notification:', error);
+    }
+  }
+
+  // Create notifications
+  try {
+    const { createNotificationInternal } = require('./notification.controller');
+    
+    // Notify kitchen staff
+    await createNotificationInternal({
+      recipient_role: 'CHEF',
+      title: 'Compensating Production Order Created',
+      message: `Production order ${compOrderNo} created to compensate shortage from ${originalOrder.prod_order_no}. Estimated cost: ${totalCompensationCost.toLocaleString()} VND`,
+      type: priority === 'URGENT' ? 'URGENT' : 'INFO',
+      ref_type: 'PRODUCTION',
+      ref_id: compensatingOrder._id
+    });
+
+    // Notify manager about cost impact
+    await createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Production Shortage Cost Impact',
+      message: `Compensating order ${compOrderNo} will cost ${totalCompensationCost.toLocaleString()} VND. ${insufficientMaterials.length > 0 ? 'Material purchase required.' : 'Materials available.'}`,
+      type: totalCompensationCost > 1000000 ? 'URGENT' : 'INFO',
+      ref_type: 'PRODUCTION',
+      ref_id: compensatingOrder._id
+    });
+  } catch (error) {
+    console.error('Error creating notifications:', error);
+  }
+
+  const populatedOrder = await ProductionOrder.findById(compensatingOrder._id)
+    .populate('created_by', 'username full_name');
+
+  return res.status(201).json(
+    ApiResponse.success({
+      compensating_order: populatedOrder,
+      lines: compensatingLines,
+      original_order_id: originalOrder._id,
+      cost_analysis: {
+        total_compensation_cost: totalCompensationCost,
+        currency: 'VND',
+        material_requirements: materialRequirements,
+        materials_sufficient: insufficientMaterials.length === 0
+      },
+      material_shortage: insufficientMaterials.length > 0 ? {
+        insufficient_materials: insufficientMaterials,
+        material_request_id: materialRequestId,
+        total_shortage_cost: insufficientMaterials.reduce((sum, m) => sum + (m.shortage_qty * m.unit_cost), 0)
+      } : null
+    }, 'Compensating production order created with cost analysis', 201)
+  );
+});
+
+// @desc    Check production variance and suggest compensation
+// @route   GET /api/production-orders/:id/variance-check
+// @access  Private (Chef, Manager, Admin)
+exports.checkProductionVariance = asyncHandler(async (req, res) => {
+  const productionOrder = await ProductionOrder.findById(req.params.id);
+  if (!productionOrder) {
+    return res.status(404).json(
+      ApiResponse.error('Production order not found', 404)
+    );
+  }
+
+  // Get all production lines with variance
+  const orderLines = await ProductionOrderLine.find({ prod_order_id: productionOrder._id })
+    .populate('item_id', 'sku name item_type cost_price')
+    .populate('uom_id', 'code name');
+
+  const varianceAnalysis = orderLines.map(line => {
+    const plannedQty = line.planned_qty || 0;
+    const actualQty = line.actual_qty || 0;
+    const variance = actualQty - plannedQty;
+    const variancePercent = plannedQty > 0 ? ((variance / plannedQty) * 100).toFixed(2) : 0;
+
+    return {
+      line_id: line._id,
+      item: line.item_id || { _id: 'unknown', name: 'Unknown Item', cost_price: 0 },
+      uom: line.uom_id || { _id: 'unknown', code: 'UNK' },
+      planned_qty: plannedQty,
+      actual_qty: actualQty,
+      variance: variance,
+      variance_percent: parseFloat(variancePercent),
+      shortage_qty: variance < 0 ? Math.abs(variance) : 0,
+      excess_qty: variance > 0 ? variance : 0,
+      needs_compensation: variance < 0
+    };
+  });
+
+  const shortageItems = varianceAnalysis.filter(item => item.needs_compensation);
+  const totalShortageValue = shortageItems.reduce((sum, item) => {
+    const itemCost = item.item?.cost_price || 0;
+    return sum + (item.shortage_qty * itemCost);
+  }, 0);
+
+  return res.status(200).json(
+    ApiResponse.success({
+      production_order: productionOrder,
+      variance_analysis: varianceAnalysis,
+      summary: {
+        total_lines: orderLines.length,
+        lines_with_shortage: shortageItems.length,
+        lines_with_excess: varianceAnalysis.filter(item => item.excess_qty > 0).length,
+        total_shortage_value: totalShortageValue,
+        needs_compensation: shortageItems.length > 0
+      },
+      shortage_items: shortageItems,
+      compensation_suggestion: shortageItems.length > 0 ? {
+        recommended_action: 'CREATE_COMPENSATING_ORDER',
+        priority: totalShortageValue > 1000000 ? 'URGENT' : 'NORMAL', // > 1M VND
+        estimated_time: '24 hours',
+        items_to_produce: shortageItems.map(item => ({
+          item_id: item.item?._id || 'unknown',
+          shortage_qty: item.shortage_qty,
+          uom_id: item.uom?._id || 'unknown'
+        }))
+      } : null
+    })
+  );
+});
+
+// @desc    Execute compensating production with automatic material consumption
+// @route   POST /api/production-orders/:id/execute-compensation
+// @access  Private (Chef, Manager, Admin)
+exports.executeCompensatingProduction = asyncHandler(async (req, res) => {
+  const compensatingOrder = await ProductionOrder.findById(req.params.id)
+    .populate('created_by', 'username full_name org_unit_id');
+
+  if (!compensatingOrder) {
+    return res.status(404).json(
+      ApiResponse.error('Compensating production order not found', 404)
+    );
+  }
+
+  if (!compensatingOrder.is_compensating_order) {
+    return res.status(400).json(
+      ApiResponse.error('This is not a compensating production order', 400)
+    );
+  }
+
+  if (compensatingOrder.status !== 'RELEASED') {
+    return res.status(400).json(
+      ApiResponse.error('Compensating order must be RELEASED to execute', 400)
+    );
+  }
+
+  // Get compensating order lines
+  const orderLines = await ProductionOrderLine.find({ prod_order_id: compensatingOrder._id })
+    .populate('item_id', 'sku name cost_price')
+    .populate('recipe_id', 'version status')
+    .populate('uom_id', 'code name');
+
+  if (!orderLines.length) {
+    return res.status(400).json(
+      ApiResponse.error('No production lines found', 400)
+    );
+  }
+
+  // Get required models
+  const Recipe = require('../models/Recipe');
+  const RecipeLine = require('../models/RecipeLine');
+  const InventoryBalance = require('../models/InventoryBalance');
+  const InventoryTransaction = require('../models/InventoryTransaction');
+  const ProductionConsumption = require('../models/ProductionConsumption');
+  const Location = require('../models/Location');
+  const ProductionVarianceCost = require('../models/ProductionVarianceCost');
+
+  // Find raw material location
+  const orgUnitId = compensatingOrder.created_by?.org_unit_id?._id || compensatingOrder.created_by?.org_unit_id;
+  const rawLocation = await Location.findOne({
+    org_unit_id: orgUnitId,
+    $or: [
+      { code: { $regex: 'RAW', $options: 'i' } },
+      { name: { $regex: 'RAW', $options: 'i' } },
+      { name: { $regex: 'NGUYÊN', $options: 'i' } }
+    ]
+  }) || await Location.findOne({
+    $or: [
+      { code: { $regex: 'RAW', $options: 'i' } },
+      { name: { $regex: 'RAW', $options: 'i' } }
+    ]
+  });
+
+  if (!rawLocation) {
+    return res.status(400).json(
+      ApiResponse.error('Raw material location not found', 400)
+    );
+  }
+
+  let totalMaterialCost = 0;
+  const materialCosts = [];
+  const consumptionRecords = [];
+
+  // Process each production line
+  for (const line of orderLines) {
+    // Get recipe lines for material consumption
+    const recipeLines = await RecipeLine.find({ recipe_id: line.recipe_id._id })
+      .populate('material_item_id', 'sku name cost_price')
+      .populate('uom_id', 'code name');
+
+    for (const recipeLine of recipeLines) {
+      const requiredQty = (recipeLine.qty_per_batch || 0) * line.planned_qty;
+      const unitCost = recipeLine.material_item_id?.cost_price || 0;
+      const materialCost = requiredQty * unitCost;
+
+      if (requiredQty > 0) {
+        // Check inventory availability
+        const balance = await InventoryBalance.findOne({
+          location_id: rawLocation._id,
+          item_id: recipeLine.material_item_id._id
+        });
+
+        if (!balance || balance.qty_on_hand < requiredQty) {
+          return res.status(400).json(
+            ApiResponse.error(
+              `Insufficient inventory for ${recipeLine.material_item_id.name}. Required: ${requiredQty}, Available: ${balance?.qty_on_hand || 0}`,
+              400
+            )
+          );
+        }
+
+        // Update inventory balance (consume materials)
+        balance.qty_on_hand -= requiredQty;
+        balance.updated_at = new Date();
+        await balance.save();
+
+        // Create inventory transaction
+        await InventoryTransaction.create({
+          txn_time: new Date(),
+          location_id: rawLocation._id,
+          item_id: recipeLine.material_item_id._id,
+          qty: -requiredQty, // Negative for consumption
+          uom_id: recipeLine.uom_id._id,
+          txn_type: 'CONSUMPTION',
+          ref_type: 'PRODUCTION_ORDER',
+          ref_id: compensatingOrder._id,
+          created_by: req.user.id,
+          unit_cost: unitCost,
+          total_value: -materialCost, // Negative for cost
+          notes: `Auto-consumption for compensating production ${compensatingOrder.prod_order_no}`
+        });
+
+        // Create production consumption record
+        const consumption = await ProductionConsumption.create({
+          prod_order_line_id: line._id,
+          material_item_id: recipeLine.material_item_id._id,
+          qty: requiredQty,
+          uom_id: recipeLine.uom_id._id
+        });
+
+        consumptionRecords.push(consumption);
+        totalMaterialCost += materialCost;
+
+        materialCosts.push({
+          material_item_id: recipeLine.material_item_id._id,
+          material_name: recipeLine.material_item_id.name,
+          quantity_used: requiredQty,
+          unit_cost: unitCost,
+          total_cost: materialCost,
+          uom_id: recipeLine.uom_id._id
+        });
+      }
+    }
+  }
+
+  // Update compensating order status and cost
+  compensatingOrder.status = 'IN_PROGRESS';
+  compensatingOrder.actual_start = new Date();
+  compensatingOrder.actual_material_cost = totalMaterialCost;
+  compensatingOrder.updated_at = new Date();
+  await compensatingOrder.save();
+
+  // Create production variance cost record
+  const originalOrder = await ProductionOrder.findById(compensatingOrder.compensating_for_order_id);
+  const originalLines = await ProductionOrderLine.find({ prod_order_id: originalOrder._id });
+  
+  const totalPlanned = originalLines.reduce((sum, line) => sum + (line.planned_qty || 0), 0);
+  const totalActual = originalLines.reduce((sum, line) => sum + (line.actual_qty || 0), 0);
+  const shortageQty = Math.max(0, totalPlanned - totalActual);
+
+  const varianceCost = await ProductionVarianceCost.create({
+    _id: `pvc_${Date.now()}`,
+    original_production_order_id: originalOrder._id,
+    compensating_production_order_id: compensatingOrder._id,
+    variance_type: 'SHORTAGE',
+    planned_quantity: totalPlanned,
+    actual_quantity: totalActual,
+    shortage_quantity: shortageQty,
+    material_costs: materialCosts,
+    total_variance_cost: totalMaterialCost,
+    impact_on_profit: -totalMaterialCost, // Negative impact on profit
+    reason: 'Production shortage compensation',
+    created_by: req.user.id,
+    status: 'PENDING'
+  });
+
+  // Create notifications
+  try {
+    const { createNotificationInternal } = require('./notification.controller');
+    
+    // Notify manager about cost impact
+    await createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Production Variance Cost Incurred',
+      message: `Compensating production ${compensatingOrder.prod_order_no} started. Material cost: ${totalMaterialCost.toLocaleString()} VND. Profit impact: -${totalMaterialCost.toLocaleString()} VND`,
+      type: totalMaterialCost > 500000 ? 'URGENT' : 'INFO',
+      ref_type: 'PRODUCTION',
+      ref_id: compensatingOrder._id
+    });
+
+    // Notify chef about execution
+    await createNotificationInternal({
+      recipient_role: 'CHEF',
+      title: 'Compensating Production Started',
+      message: `Production ${compensatingOrder.prod_order_no} materials consumed. Ready for production execution.`,
+      type: 'INFO',
+      ref_type: 'PRODUCTION',
+      ref_id: compensatingOrder._id
+    });
+  } catch (error) {
+    console.error('Error creating notifications:', error);
+  }
+
+  return res.status(200).json(
+    ApiResponse.success({
+      compensating_order: compensatingOrder,
+      material_consumption: {
+        total_materials_consumed: consumptionRecords.length,
+        total_cost: totalMaterialCost,
+        currency: 'VND',
+        materials: materialCosts
+      },
+      variance_cost_record: varianceCost,
+      profit_impact: {
+        amount: -totalMaterialCost,
+        currency: 'VND',
+        note: 'Company absorbs this cost - customer payment unchanged'
+      }
+    }, 'Compensating production executed with automatic material consumption', 200)
+  );
+});
+
+// @desc    Record production waste
+// @route   POST /api/production-orders/:id/waste
+// @access  Private (Chef, Manager, Admin)
+exports.recordProductionWaste = asyncHandler(async (req, res) => {
+  const { waste_items } = req.body;
+
+  if (!waste_items || waste_items.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('Waste items are required', 400)
+    );
+  }
+
+  const productionOrder = await ProductionOrder.findById(req.params.id);
+  if (!productionOrder) {
+    return res.status(404).json(
+      ApiResponse.error('Production order not found', 404)
+    );
+  }
+
+  const WasteTransaction = require('../models/WasteTransaction');
+  const Item = require('../models/Item');
+  const Location = require('../models/Location');
+
+  // Get kitchen location - use user's org_unit_id since production orders are created by kitchen staff
+  const kitchenLocation = await Location.findOne({ 
+    org_unit_id: req.user.org_unit_id,
+    status: 'ACTIVE'
+  });
+
+  if (!kitchenLocation) {
+    // If no location found, create a default one or use a fallback
+    return res.status(400).json(
+      ApiResponse.error(`Kitchen location not found for org unit: ${req.user.org_unit_id}`, 400)
+    );
+  }
+
+  const wasteTransactions = [];
+
+  // Create waste transactions for each waste item
+  for (const wasteItem of waste_items) {
+    const item = await Item.findById(wasteItem.item_id);
+    if (!item) {
+      continue; // Skip invalid items
+    }
+
+    const wasteValue = (item.cost_price || 0) * wasteItem.quantity_wasted;
+
+    const wasteTransaction = await WasteTransaction.create({
+      _id: `waste_prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      waste_type: 'PRODUCTION_WASTE',
+      reference_type: 'PRODUCTION_ORDER',
+      reference_id: productionOrder._id,
+      item_id: wasteItem.item_id,
+      lot_id: wasteItem.lot_id || null,
+      quantity_wasted: wasteItem.quantity_wasted,
+      uom_id: wasteItem.uom_id,
+      unit_cost: item.cost_price || 0,
+      total_waste_value: wasteValue,
+      location_id: kitchenLocation._id,
+      reason: wasteItem.reason || 'Production waste',
+      notes: wasteItem.notes || '',
+      disposal_method: wasteItem.disposal_method || 'TRASH',
+      created_by: req.user.id
+    });
+
+    wasteTransactions.push(wasteTransaction);
+  }
+
+  // Notify manager if waste value is significant
+  const totalWasteValue = wasteTransactions.reduce((sum, wt) => sum + wt.total_waste_value, 0);
+  
+  if (totalWasteValue > 500000) { // > 500k VND
+    try {
+      const { createNotificationInternal } = require('./notification.controller');
+      await createNotificationInternal({
+        recipient_role: 'MANAGER',
+        title: 'High Production Waste Recorded',
+        message: `Production order ${productionOrder.order_no} recorded ${totalWasteValue.toLocaleString()} VND in waste materials.`,
+        type: 'URGENT',
+        ref_type: 'PRODUCTION',
+        ref_id: productionOrder._id
+      });
+    } catch (error) {
+      console.error('Error creating waste notification:', error);
+    }
+  }
+
+  return res.status(201).json(
+    ApiResponse.success({
+      production_order_id: productionOrder._id,
+      waste_transactions: wasteTransactions,
+      total_waste_value: totalWasteValue
+    }, 'Production waste recorded successfully', 201)
+  );
+});
