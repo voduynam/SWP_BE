@@ -127,6 +127,20 @@ router.use(protect);
 
 /**
  * @swagger
+ * /api/shipments/check-pending-receipts:
+ *   get:
+ *     summary: Check pending receipts and send notifications
+ *     tags: [Shipments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending receipts check completed
+ */
+router.get('/check-pending-receipts', authorize('MANAGER', 'ADMIN'), shipmentController.checkPendingReceipts);
+
+/**
+ * @swagger
  * /api/shipments:
  *   get:
  *     summary: Get all shipments
@@ -324,5 +338,43 @@ router.put('/:id/dispatch', authorize('CHEF', 'MANAGER', 'ADMIN', 'SUPPLY_COORDI
  *         description: COD collected successfully
  */
 router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
+
+/**
+ * @swagger
+ * /api/shipments/{id}/confirm-receipt:
+ *   put:
+ *     summary: Staff confirm receipt of shipment
+ *     tags: [Shipments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Shipment ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               receipt_status:
+ *                 type: string
+ *                 enum: [RECEIVED_OK, RECEIVED_WITH_ISSUES, NOT_RECEIVED]
+ *                 description: Receipt confirmation status
+ *               receipt_notes:
+ *                 type: string
+ *                 description: Notes about the receipt
+ *               delivery_discrepancy:
+ *                 type: string
+ *                 description: Description of any issues or discrepancies
+ *     responses:
+ *       200:
+ *         description: Receipt confirmed successfully
+ */
+router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), shipmentController.confirmReceipt);
 
 module.exports = router;

@@ -59,6 +59,42 @@ const shipmentSchema = new mongoose.Schema({
     ref: 'AppUser',
     default: null
   },
+  // Staff receipt confirmation fields
+  received_by_staff: {
+    type: String,
+    ref: 'AppUser',
+    default: null
+  },
+  received_at: {
+    type: Date,
+    default: null
+  },
+  receipt_notes: {
+    type: String,
+    default: ''
+  },
+  receipt_status: {
+    type: String,
+    enum: ['PENDING_RECEIPT', 'RECEIVED_OK', 'RECEIVED_WITH_ISSUES', 'NOT_RECEIVED'],
+    default: 'PENDING_RECEIPT'
+  },
+  delivery_discrepancy: {
+    type: String,
+    default: ''
+  },
+  // Notification tracking
+  staff_notified_at: {
+    type: Date,
+    default: null
+  },
+  staff_reminder_sent_at: {
+    type: Date,
+    default: null
+  },
+  manager_escalated_at: {
+    type: Date,
+    default: null
+  },
   created_by: {
     type: String,
     required: true,

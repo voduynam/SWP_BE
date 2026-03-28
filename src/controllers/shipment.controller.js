@@ -292,6 +292,12 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
     shipment.delivery_photo_uploaded_at = new Date();
   }
 
+  // Set receipt status to PENDING_RECEIPT when delivered
+  if (status === 'DELIVERED') {
+    shipment.receipt_status = 'PENDING_RECEIPT';
+    shipment.staff_notified_at = new Date();
+  }
+
   await shipment.save();
 
   // --- [WORKFLOW SYNC] ---
@@ -305,6 +311,18 @@ exports.updateShipmentStatus = asyncHandler(async (req, res) => {
       order.updated_at = new Date();
       await order.save();
     }
+
+    // Notify staff to confirm receipt
+    const notificationController = require('./notification.controller');
+    await notificationController.createNotificationInternal({
+      recipient_role: 'STORE_STAFF',
+      recipient_id: order ? order.created_by : null,
+      title: 'Hàng đã được giao',
+      message: `Chuyến hàng ${shipment.shipment_no} đã được giao đến. Vui lòng xác nhận đã nhận hàng.`,
+      type: 'INFO',
+      ref_type: 'SHIPMENT',
+      ref_id: shipment._id
+    });
   }
 
   const populatedShipment = await Shipment.findById(shipment._id)
@@ -565,5 +583,173 @@ exports.collectCOD = asyncHandler(async (req, res) => {
         status: 'COLLECTED_PENDING_CONFIRMATION'
       }
     }, 'COD payment collected successfully. Waiting for manager confirmation.')
+  );
+});
+
+// @desc    Staff confirm receipt of shipment
+// @route   PUT /api/shipments/:id/confirm-receipt
+// @access  Private (Store Staff, Manager, Admin)
+exports.confirmReceipt = asyncHandler(async (req, res) => {
+  const { receipt_status, receipt_notes, delivery_discrepancy } = req.body;
+  
+  const shipment = await Shipment.findById(req.params.id)
+    .populate('order_id', 'order_no status')
+    .populate('to_location_id', 'name code');
+    
+  if (!shipment) {
+    return res.status(404).json(
+      ApiResponse.error('Shipment not found', 404)
+    );
+  }
+
+  // Check if shipment is delivered
+  if (shipment.status !== 'DELIVERED') {
+    return res.status(400).json(
+      ApiResponse.error('Shipment must be delivered before staff can confirm receipt', 400)
+    );
+  }
+
+  // Check if already confirmed
+  if (shipment.receipt_status !== 'PENDING_RECEIPT') {
+    return res.status(400).json(
+      ApiResponse.error('Receipt already confirmed for this shipment', 400)
+    );
+  }
+
+  // Validate receipt status
+  const validReceiptStatuses = ['RECEIVED_OK', 'RECEIVED_WITH_ISSUES', 'NOT_RECEIVED'];
+  if (!validReceiptStatuses.includes(receipt_status)) {
+    return res.status(400).json(
+      ApiResponse.error('Invalid receipt status', 400)
+    );
+  }
+
+  // Update shipment with receipt confirmation
+  shipment.received_by_staff = req.user.id;
+  shipment.received_at = new Date();
+  shipment.receipt_status = receipt_status;
+  shipment.receipt_notes = receipt_notes || '';
+  shipment.delivery_discrepancy = delivery_discrepancy || '';
+  await shipment.save();
+
+  // Update internal order status based on receipt confirmation
+  const order = await InternalOrder.findById(shipment.order_id._id);
+  if (order) {
+    if (receipt_status === 'RECEIVED_OK') {
+      order.status = 'RECEIVED';
+    } else if (receipt_status === 'RECEIVED_WITH_ISSUES') {
+      order.status = 'RECEIVED'; // Still received but with issues noted
+    }
+    // For NOT_RECEIVED, keep order status as SHIPPED for investigation
+    await order.save();
+  }
+
+  // Create notifications based on receipt status
+  const notificationController = require('./notification.controller');
+  
+  if (receipt_status === 'RECEIVED_OK') {
+    await notificationController.createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Xác nhận nhận hàng',
+      message: `Nhân viên đã xác nhận nhận hàng thành công cho chuyến hàng ${shipment.shipment_no}`,
+      type: 'SUCCESS',
+      ref_type: 'SHIPMENT',
+      ref_id: shipment._id
+    });
+  } else if (receipt_status === 'RECEIVED_WITH_ISSUES') {
+    await notificationController.createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Nhận hàng có vấn đề',
+      message: `Nhân viên báo cáo vấn đề khi nhận hàng ${shipment.shipment_no}: ${delivery_discrepancy}`,
+      type: 'URGENT',
+      ref_type: 'SHIPMENT',
+      ref_id: shipment._id
+    });
+  } else if (receipt_status === 'NOT_RECEIVED') {
+    await notificationController.createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Chưa nhận được hàng',
+      message: `Nhân viên xác nhận CHƯA nhận được hàng ${shipment.shipment_no}. Cần kiểm tra ngay!`,
+      type: 'URGENT',
+      ref_type: 'SHIPMENT',
+      ref_id: shipment._id
+    });
+  }
+
+  const populatedShipment = await Shipment.findById(shipment._id)
+    .populate('order_id', 'order_no status')
+    .populate('received_by_staff', 'username full_name')
+    .populate('to_location_id', 'name code');
+
+  return res.status(200).json(
+    ApiResponse.success(populatedShipment, 'Receipt confirmation recorded successfully')
+  );
+});
+
+// @desc    Check pending receipts and send notifications
+// @route   GET /api/shipments/check-pending-receipts
+// @access  Private (System/Manager)
+exports.checkPendingReceipts = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+
+  // Find shipments delivered but not yet confirmed by staff
+  const pendingShipments = await Shipment.find({
+    status: 'DELIVERED',
+    receipt_status: 'PENDING_RECEIPT',
+    delivery_photo_uploaded_at: { $exists: true, $ne: null }
+  }).populate('order_id', 'order_no created_by')
+    .populate('to_location_id', 'name code');
+
+  let remindersSent = 0;
+  let escalationsSent = 0;
+
+  for (const shipment of pendingShipments) {
+    const deliveredAt = shipment.delivery_photo_uploaded_at;
+    
+    // Send 1-hour reminder if not already sent
+    if (deliveredAt <= oneHourAgo && !shipment.staff_reminder_sent_at) {
+      const notificationController = require('./notification.controller');
+      await notificationController.createNotificationInternal({
+        recipient_role: 'STORE_STAFF',
+        recipient_id: shipment.order_id.created_by,
+        title: 'Nhắc nhở xác nhận nhận hàng',
+        message: `Vui lòng xác nhận đã nhận hàng cho chuyến hàng ${shipment.shipment_no}. Hàng đã được giao 1 giờ trước.`,
+        type: 'INFO',
+        ref_type: 'SHIPMENT',
+        ref_id: shipment._id
+      });
+
+      shipment.staff_reminder_sent_at = now;
+      await shipment.save();
+      remindersSent++;
+    }
+
+    // Send 24-hour escalation if not already sent
+    if (deliveredAt <= twentyFourHoursAgo && !shipment.manager_escalated_at) {
+      const notificationController = require('./notification.controller');
+      await notificationController.createNotificationInternal({
+        recipient_role: 'MANAGER',
+        title: 'Cảnh báo: Chưa xác nhận nhận hàng',
+        message: `Nhân viên chưa xác nhận nhận hàng ${shipment.shipment_no} sau 24 giờ giao hàng. Cần kiểm tra ngay!`,
+        type: 'URGENT',
+        ref_type: 'SHIPMENT',
+        ref_id: shipment._id
+      });
+
+      shipment.manager_escalated_at = now;
+      await shipment.save();
+      escalationsSent++;
+    }
+  }
+
+  return res.status(200).json(
+    ApiResponse.success({
+      total_pending: pendingShipments.length,
+      reminders_sent: remindersSent,
+      escalations_sent: escalationsSent,
+      checked_at: now
+    }, 'Pending receipts check completed')
   );
 });
