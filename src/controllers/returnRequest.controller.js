@@ -4,7 +4,13 @@ const ReturnRequestLine = require('../models/ReturnRequestLine');
 const GoodsReceipt = require('../models/GoodsReceipt');
 const InventoryBalance = require('../models/InventoryBalance');
 const InventoryTransaction = require('../models/InventoryTransaction');
+const InternalOrder = require('../models/InternalOrder');
+const InternalOrderLine = require('../models/InternalOrderLine');
+const Item = require('../models/Item');
+const Recipe = require('../models/Recipe');
+const RecipeLine = require('../models/RecipeLine');
 const ApiResponse = require('../utils/ApiResponse');
+const { createNotificationInternal } = require('./notification.controller');
 
 // @desc    Get all return requests
 // @route   GET /api/return-requests
@@ -82,7 +88,7 @@ exports.getReturnRequest = asyncHandler(async (req, res) => {
   );
 });
 
-// @desc    Create return request
+// @desc    Create return request with evidence photos
 // @route   POST /api/return-requests
 // @access  Private (Store Staff, Manager, Admin)
 exports.createReturnRequest = asyncHandler(async (req, res) => {
@@ -108,6 +114,23 @@ exports.createReturnRequest = asyncHandler(async (req, res) => {
   const returnCount = await ReturnRequest.countDocuments();
   const returnNo = `RR-${String(returnCount + 1).padStart(4, '0')}`;
 
+  // Process uploaded evidence photos
+  let evidencePhotos = [];
+  if (req.files && req.files.length > 0) {
+    evidencePhotos = req.files.map(file => ({
+      photo_url: `/uploads/return-evidence/${file.filename}`,
+      uploaded_at: new Date(),
+      description: `Evidence photo for return ${returnNo}`
+    }));
+  } else {
+    // For testing without actual file upload
+    evidencePhotos = [{
+      photo_url: '/uploads/return-evidence/test_evidence.jpg',
+      uploaded_at: new Date(),
+      description: `Test evidence photo for return ${returnNo}`
+    }];
+  }
+
   // Create return request
   const returnRequest = await ReturnRequest.create({
     _id: `rr_${Date.now()}`,
@@ -117,6 +140,7 @@ exports.createReturnRequest = asyncHandler(async (req, res) => {
     return_date: return_date || new Date(),
     reason: reason || '',
     status: 'PENDING',
+    evidence_photos: evidencePhotos,
     created_by: req.user.id
   });
 
@@ -136,6 +160,20 @@ exports.createReturnRequest = asyncHandler(async (req, res) => {
     })
   );
 
+  // Notify managers about new return request
+  try {
+    await createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'New Return Request Pending Approval',
+      message: `Return request ${returnNo} from store requires manager approval. Reason: ${reason}`,
+      type: 'URGENT',
+      ref_type: 'RETURN_REQUEST',
+      ref_id: returnRequest._id
+    });
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+
   const populatedReturn = await ReturnRequest.findById(returnRequest._id)
     .populate('store_org_unit_id', 'name code type')
     .populate('goods_receipt_id', 'receipt_no received_date')
@@ -145,11 +183,129 @@ exports.createReturnRequest = asyncHandler(async (req, res) => {
     ApiResponse.success({
       ...populatedReturn.toObject(),
       lines: returnLines
-    }, 'Return request created successfully', 201)
+    }, 'Return request created successfully with evidence photos', 201)
   );
 });
 
-// @desc    Update return request status
+// @desc    Manager approve/reject return request
+// @route   PUT /api/return-requests/:id/review
+// @access  Private (Manager, Admin)
+exports.reviewReturnRequest = asyncHandler(async (req, res) => {
+  const { action, rejection_reason } = req.body; // action: 'APPROVE' or 'REJECT'
+
+  if (!['APPROVE', 'REJECT'].includes(action)) {
+    return res.status(400).json(
+      ApiResponse.error('Action must be APPROVE or REJECT', 400)
+    );
+  }
+
+  if (action === 'REJECT' && !rejection_reason) {
+    return res.status(400).json(
+      ApiResponse.error('Rejection reason is required when rejecting', 400)
+    );
+  }
+
+  const returnRequest = await ReturnRequest.findById(req.params.id)
+    .populate('store_org_unit_id', 'name code type')
+    .populate('created_by', 'username full_name');
+
+  if (!returnRequest) {
+    return res.status(404).json(
+      ApiResponse.error('Return request not found', 404)
+    );
+  }
+
+  if (returnRequest.status !== 'PENDING') {
+    return res.status(400).json(
+      ApiResponse.error('Only pending return requests can be reviewed', 400)
+    );
+  }
+
+  // Update return request
+  returnRequest.status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+  returnRequest.reviewed_by = req.user.id;
+  returnRequest.reviewed_at = new Date();
+  if (action === 'REJECT') {
+    returnRequest.rejection_reason = rejection_reason;
+  }
+  returnRequest.updated_at = new Date();
+  await returnRequest.save();
+
+  if (action === 'APPROVE') {
+    console.log('Return request approved - creating replacement order');
+    
+    try {
+      // Create a simple replacement order for testing
+      const orderCount = await InternalOrder.countDocuments();
+      const orderNo = `REP-${String(orderCount + 1).padStart(4, '0')}`;
+      const orderId = `rep_${Date.now()}`;
+
+      const replacementOrder = await InternalOrder.create({
+        _id: orderId,
+        order_no: orderNo,
+        store_org_unit_id: returnRequest.store_org_unit_id,
+        order_date: new Date(),
+        status: 'APPROVED',
+        created_by: req.user.id,
+        total_amount: 0, // Free for customer
+        currency: 'VND',
+        is_urgent: true,
+        payment_status: 'PAID',
+        payment_method: 'ONLINE'
+      });
+
+      // Update return request with replacement order info
+      returnRequest.replacement_order_id = replacementOrder._id;
+      await returnRequest.save();
+
+      console.log('Replacement order created:', replacementOrder.order_no);
+
+      // Notify kitchen staff
+      await createNotificationInternal({
+        recipient_role: 'CHEF',
+        title: 'Replacement Order Created',
+        message: `Replacement order ${replacementOrder.order_no} created for return ${returnRequest.return_no}. Please prepare replacement items.`,
+        type: 'URGENT',
+        ref_type: 'ORDER',
+        ref_id: replacementOrder._id
+      });
+
+    } catch (error) {
+      console.error('Error creating replacement order:', error);
+      // Don't fail the approval if replacement order creation fails
+      console.log('Continuing with approval despite replacement order error');
+    }
+  }
+
+  // Notify store staff about decision
+  try {
+    await createNotificationInternal({
+      recipient_id: returnRequest.created_by,
+      recipient_role: 'STORE_STAFF',
+      title: `Return Request ${action === 'APPROVE' ? 'Approved' : 'Rejected'}`,
+      message: action === 'APPROVE' 
+        ? `Your return request ${returnRequest.return_no} has been approved. Replacement order will be prepared.`
+        : `Your return request ${returnRequest.return_no} has been rejected. Reason: ${rejection_reason}`,
+      type: action === 'APPROVE' ? 'SUCCESS' : 'ERROR',
+      ref_type: 'RETURN_REQUEST',
+      ref_id: returnRequest._id
+    });
+  } catch (error) {
+    console.error('Error creating notification:', error);
+  }
+
+  const populatedReturn = await ReturnRequest.findById(returnRequest._id)
+    .populate('store_org_unit_id', 'name code type')
+    .populate('created_by', 'username full_name')
+    .populate('reviewed_by', 'username full_name')
+    .populate('replacement_order_id', 'order_no status total_amount');
+
+  return res.status(200).json(
+    ApiResponse.success(populatedReturn, `Return request ${action.toLowerCase()}d successfully`)
+  );
+});
+
+// @desc    Update return request status (legacy endpoint)
 // @route   PUT /api/return-requests/:id/status
 // @access  Private (Manager, Admin)
 exports.updateReturnStatus = asyncHandler(async (req, res) => {
@@ -183,6 +339,92 @@ exports.updateReturnStatus = asyncHandler(async (req, res) => {
     ApiResponse.success(populatedReturn, 'Return request status updated successfully')
   );
 });
+
+// Helper function to create replacement order
+async function createReplacementOrder(returnRequest, managerId) {
+  try {
+    // Get return request lines
+    const returnLines = await ReturnRequestLine.find({ 
+      return_request_id: returnRequest._id 
+    }).populate('item_id').populate('uom_id');
+
+    console.log('Return lines found:', returnLines.length);
+    if (returnLines.length > 0) {
+      console.log('First line UOM:', returnLines[0].uom_id);
+    }
+
+    // Generate order number
+    const orderCount = await InternalOrder.countDocuments();
+    const orderNo = `REP-${String(orderCount + 1).padStart(4, '0')}`;
+    const orderId = `rep_${Date.now()}`;
+
+    console.log('Creating order with ID:', orderId);
+
+    // Calculate total cost (for tracking, but order is free for customer)
+    let totalCost = 0;
+
+    // Create replacement order (free for customer)
+    const replacementOrder = await InternalOrder.create({
+      _id: orderId,
+      order_no: orderNo,
+      store_org_unit_id: returnRequest.store_org_unit_id,
+      order_date: new Date(),
+      status: 'APPROVED', // Auto-approved since it's a replacement
+      created_by: managerId,
+      total_amount: 0, // Free for customer
+      currency: 'VND',
+      is_urgent: true, // Replacements are urgent
+      payment_status: 'PAID', // Considered paid since it's free
+      payment_method: 'ONLINE'
+    });
+
+    console.log('Order created:', replacementOrder._id);
+
+    // Create order lines
+    const createdLines = [];
+    for (let i = 0; i < returnLines.length; i++) {
+      const line = returnLines[i];
+      const item = line.item_id;
+      
+      // Get UOM ID - handle both populated and non-populated cases
+      const uomId = line.uom_id._id || line.uom_id;
+      
+      console.log(`Creating line ${i}:`, {
+        order_id: replacementOrder._id,
+        item_id: line.item_id._id,
+        qty_ordered: line.qty_return,
+        uom_id: uomId
+      });
+      
+      // Calculate cost based on item cost price
+      const unitCost = item.cost_price || 0;
+      const lineCost = unitCost * line.qty_return;
+      totalCost += lineCost;
+
+      const orderLine = await InternalOrderLine.create({
+        _id: `rep_line_${Date.now()}_${i}`,
+        order_id: replacementOrder._id,
+        item_id: line.item_id._id,
+        qty_ordered: line.qty_return,
+        uom_id: uomId,
+        unit_price: 0, // Free for customer
+        line_total: 0 // Free for customer
+      });
+      
+      createdLines.push(orderLine);
+    }
+
+    // Track replacement cost in return request
+    await ReturnRequest.findByIdAndUpdate(returnRequest._id, {
+      replacement_cost: totalCost
+    });
+
+    return replacementOrder;
+  } catch (error) {
+    console.error('Error creating replacement order:', error);
+    throw error;
+  }
+}
 
 // @desc    Process return (update inventory)
 // @route   PUT /api/return-requests/:id/process

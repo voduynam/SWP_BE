@@ -292,4 +292,37 @@ router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER', 'SUPPL
  */
 router.put('/:id/dispatch', authorize('CHEF', 'MANAGER', 'ADMIN', 'SUPPLY_COORDINATOR'), shipmentController.confirmDispatch);
 
+/**
+ * @swagger
+ * /api/shipments/{id}/collect-cod:
+ *   put:
+ *     summary: Collect COD payment (Driver)
+ *     tags: [Shipments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               collected_amount:
+ *                 type: number
+ *                 description: Amount collected from customer
+ *               notes:
+ *                 type: string
+ *                 description: Additional notes
+ *     responses:
+ *       200:
+ *         description: COD collected successfully
+ */
+router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
+
 module.exports = router;

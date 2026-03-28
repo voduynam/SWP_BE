@@ -649,3 +649,84 @@ exports.paymentCallback = asyncHandler(async (req, res) => {
     );
   }
 });
+
+// @desc    Confirm COD payment (for managers)
+// @route   PUT /api/payments/:payment_id/confirm-cod
+// @access  Private (Manager, Admin)
+exports.confirmCOD = asyncHandler(async (req, res) => {
+  const { confirmed_amount, notes } = req.body;
+  
+  const Payment = require('../models/Payment');
+  const payment = await Payment.findById(req.params.payment_id);
+  
+  if (!payment) {
+    return res.status(404).json(
+      ApiResponse.error('Payment not found', 404)
+    );
+  }
+
+  if (payment.payment_method !== 'COD') {
+    return res.status(400).json(
+      ApiResponse.error('This is not a COD payment', 400)
+    );
+  }
+
+  if (payment.payment_status !== 'COD_COLLECTED') {
+    return res.status(400).json(
+      ApiResponse.error('COD payment must be collected before confirmation', 400)
+    );
+  }
+
+  // Use confirmed amount or original collected amount
+  const finalAmount = confirmed_amount !== undefined ? confirmed_amount : payment.amount;
+
+  // Update payment status
+  payment.payment_status = 'COD_CONFIRMED';
+  payment.amount = finalAmount;
+  payment.paid_at = new Date();
+  if (notes) {
+    payment.metadata = {
+      ...payment.metadata,
+      manager_notes: notes,
+      confirmed_by: req.user.id,
+      confirmed_at: new Date()
+    };
+  }
+  await payment.save();
+
+  // Update order payment status
+  const InternalOrder = require('../models/InternalOrder');
+  const order = await InternalOrder.findById(payment.order_id);
+  if (order) {
+    order.payment_status = 'PAID';
+    await order.save();
+  }
+
+  // --- [NOTIFICATION TRIGGER] ---
+  const notificationController = require('./notification.controller');
+  await notificationController.createNotificationInternal({
+    recipient_role: 'STORE_STAFF',
+    recipient_id: order ? order.created_by : null,
+    title: 'COD đã xác nhận',
+    message: `Thanh toán COD cho đơn hàng ${order?.order_no} đã được xác nhận (${finalAmount.toLocaleString()} VND)`,
+    type: 'SUCCESS',
+    ref_type: 'ORDER',
+    ref_id: payment._id
+  });
+
+  const populatedPayment = await Payment.findById(payment._id)
+    .populate('order_id', 'order_no')
+    .populate('created_by', 'username full_name');
+
+  return res.status(200).json(
+    ApiResponse.success({
+      payment: populatedPayment,
+      cod_summary: {
+        original_amount: payment.metadata?.expected_amount || 0,
+        collected_amount: payment.metadata?.collected_amount || 0,
+        confirmed_amount: finalAmount,
+        status: 'CONFIRMED'
+      }
+    }, 'COD payment confirmed successfully')
+  );
+});

@@ -231,4 +231,42 @@ router.get(
   paymentController.getAllPayments
 );
 
+/**
+ * @swagger
+ * /api/payments/{payment_id}/confirm-cod:
+ *   put:
+ *     summary: Confirm COD payment (Manager)
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: payment_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               confirmed_amount:
+ *                 type: number
+ *                 description: Final confirmed amount (optional)
+ *               notes:
+ *                 type: string
+ *                 description: Manager notes
+ *     responses:
+ *       200:
+ *         description: COD confirmed successfully
+ */
+router.put(
+  '/:payment_id/confirm-cod',
+  protect,
+  authorize('ADMIN', 'MANAGER'),
+  paymentController.confirmCOD
+);
+
 module.exports = router;

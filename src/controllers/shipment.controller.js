@@ -171,6 +171,9 @@ exports.createShipment = asyncHandler(async (req, res) => {
   const shipmentCount = await Shipment.countDocuments();
   const shipmentNo = `SH-${String(shipmentCount + 1).padStart(4, '0')}`;
 
+  // Set COD amount if order uses COD payment
+  const codAmount = order.payment_method === 'COD' ? order.total_amount : 0;
+
   // Create shipment
   const shipment = await Shipment.create({
     _id: `ship_${Date.now()}`,
@@ -180,7 +183,8 @@ exports.createShipment = asyncHandler(async (req, res) => {
     to_location_id,
     ship_date: ship_date || new Date(),
     status: 'DRAFT',
-    created_by: req.user.id
+    created_by: req.user.id,
+    cod_amount: codAmount
   });
 
   // Create shipment lines
@@ -217,7 +221,7 @@ exports.createShipment = asyncHandler(async (req, res) => {
   await order.save();
 
   const populatedShipment = await Shipment.findById(shipment._id)
-    .populate('order_id', 'order_no order_date')
+    .populate('order_id', 'order_no order_date payment_method payment_status total_amount')
     .populate('from_location_id', 'name code')
     .populate('to_location_id', 'name code')
     .populate('created_by', 'username full_name');
@@ -226,7 +230,7 @@ exports.createShipment = asyncHandler(async (req, res) => {
     ApiResponse.success({
       ...populatedShipment.toObject(),
       lines: shipmentLines
-    }, 'Shipment created successfully', 201)
+    }, `Shipment created successfully${codAmount > 0 ? ` with COD amount: ${codAmount.toLocaleString()} VND` : ''}`, 201)
   );
 });
 
@@ -429,6 +433,137 @@ exports.confirmDispatch = asyncHandler(async (req, res) => {
   });
 
   return res.status(200).json(
-    ApiResponse.success(shipment, 'Shipment dispatched and CK stock deducted')
+    ApiResponse.success(populatedShipment, 'Shipment dispatched and CK stock deducted')
+  );
+});
+
+// @desc    Collect COD payment (for drivers)
+// @route   PUT /api/shipments/:id/collect-cod
+// @access  Private (Driver, Manager, Admin)
+exports.collectCOD = asyncHandler(async (req, res) => {
+  const { collected_amount, notes } = req.body;
+  
+  const shipment = await Shipment.findById(req.params.id)
+    .populate('order_id', 'order_no payment_method payment_status total_amount');
+    
+  if (!shipment) {
+    return res.status(404).json(
+      ApiResponse.error('Shipment not found', 404)
+    );
+  }
+
+  // Check if this is a COD shipment
+  if (shipment.cod_amount === 0) {
+    return res.status(400).json(
+      ApiResponse.error('This shipment does not require COD payment', 400)
+    );
+  }
+
+  // Check if already collected
+  if (shipment.cod_collected_amount > 0) {
+    return res.status(400).json(
+      ApiResponse.error('COD payment already collected for this shipment', 400)
+    );
+  }
+
+  // DRIVER: chỉ được collect COD cho shipment thuộc routes của mình
+  const roles = req.user?.roles || [];
+  const isDriverOnly = roles.includes('DRIVER') && !(
+    roles.includes('ADMIN') ||
+    roles.includes('MANAGER') ||
+    roles.includes('CHEF') ||
+    roles.includes('SUPPLY_COORDINATOR')
+  );
+  if (isDriverOnly) {
+    const AppUser = require('../models/AppUser');
+    const DeliveryRoute = require('../models/DeliveryRoute');
+    const RouteStop = require('../models/RouteStop');
+
+    const user = await AppUser.findById(req.user.id).select('full_name username');
+    const driverName = user?.full_name || user?.username;
+
+    const stop = await RouteStop.findOne({ shipment_ids: shipment._id }).select('route_id');
+    if (!stop) {
+      return res.status(403).json(ApiResponse.error('Access denied', 403));
+    }
+
+    const route = await DeliveryRoute.findById(stop.route_id).select('driver_name');
+    if (!route || route.driver_name !== driverName) {
+      return res.status(403).json(ApiResponse.error('Access denied', 403));
+    }
+  }
+
+  // Validate collected amount
+  if (!collected_amount || collected_amount < 0) {
+    return res.status(400).json(
+      ApiResponse.error('Collected amount must be provided and greater than 0', 400)
+    );
+  }
+
+  // Update shipment with COD collection info
+  shipment.cod_collected_amount = collected_amount;
+  shipment.cod_collected_at = new Date();
+  shipment.cod_collected_by = req.user.id;
+  await shipment.save();
+
+  // Create payment record with COD_COLLECTED status
+  const Payment = require('../models/Payment');
+  const paymentCount = await Payment.countDocuments();
+  const paymentNo = `COD-${String(paymentCount + 1).padStart(4, '0')}`;
+
+  const payment = await Payment.create({
+    _id: `pay_cod_${Date.now()}`,
+    payment_no: paymentNo,
+    order_id: shipment.order_id._id,
+    amount: collected_amount,
+    currency: 'VND',
+    payment_method: 'COD',
+    payment_type: 'CASH',
+    payment_status: 'COD_COLLECTED',
+    description: `COD payment collected by driver for shipment ${shipment.shipment_no}`,
+    created_by: req.user.id,
+    metadata: {
+      shipment_id: shipment._id,
+      expected_amount: shipment.cod_amount,
+      collected_amount: collected_amount,
+      notes: notes || ''
+    }
+  });
+
+  // Update order payment status
+  const InternalOrder = require('../models/InternalOrder');
+  const order = await InternalOrder.findById(shipment.order_id._id);
+  if (order) {
+    order.payment_status = 'COD_COLLECTED';
+    order.payment_id = payment._id;
+    await order.save();
+  }
+
+  // --- [NOTIFICATION TRIGGER] ---
+  const notificationController = require('./notification.controller');
+  await notificationController.createNotificationInternal({
+    recipient_role: 'MANAGER',
+    title: 'COD đã thu',
+    message: `Tài xế đã thu COD ${collected_amount.toLocaleString()} VND cho đơn hàng ${shipment.order_id.order_no}. Cần xác nhận.`,
+    type: 'INFO',
+    ref_type: 'ORDER',
+    ref_id: payment._id
+  });
+
+  const populatedShipment = await Shipment.findById(shipment._id)
+    .populate('order_id', 'order_no payment_method payment_status')
+    .populate('cod_collected_by', 'username full_name');
+
+  return res.status(200).json(
+    ApiResponse.success({
+      shipment: populatedShipment,
+      payment: payment,
+      cod_summary: {
+        expected_amount: shipment.cod_amount,
+        collected_amount: collected_amount,
+        difference: collected_amount - shipment.cod_amount,
+        status: 'COLLECTED_PENDING_CONFIRMATION'
+      }
+    }, 'COD payment collected successfully. Waiting for manager confirmation.')
   );
 });

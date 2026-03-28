@@ -46,6 +46,80 @@ const options = {
             }
           }
         }
+      },
+      responses: {
+        BadRequest: {
+          description: 'Bad Request',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: {
+                    type: 'boolean',
+                    example: false
+                  },
+                  message: {
+                    type: 'string',
+                    example: 'Bad request'
+                  },
+                  statusCode: {
+                    type: 'integer',
+                    example: 400
+                  }
+                }
+              }
+            }
+          }
+        },
+        Forbidden: {
+          description: 'Forbidden',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: {
+                    type: 'boolean',
+                    example: false
+                  },
+                  message: {
+                    type: 'string',
+                    example: 'Access denied'
+                  },
+                  statusCode: {
+                    type: 'integer',
+                    example: 403
+                  }
+                }
+              }
+            }
+          }
+        },
+        NotFound: {
+          description: 'Not Found',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: {
+                    type: 'boolean',
+                    example: false
+                  },
+                  message: {
+                    type: 'string',
+                    example: 'Resource not found'
+                  },
+                  statusCode: {
+                    type: 'integer',
+                    example: 404
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     security: [

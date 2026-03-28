@@ -238,13 +238,19 @@ exports.getInternalOrder = asyncHandler(async (req, res) => {
 // @route   POST /api/internal-orders
 // @access  Private (Store Staff, Manager, Admin)
 exports.createInternalOrder = asyncHandler(async (req, res) => {
-  const { store_org_unit_id, order_date, lines, is_urgent } = req.body;
+  const { store_org_unit_id, order_date, lines, is_urgent, payment_method } = req.body;
 
   if (!lines || lines.length === 0) {
     return res.status(400).json(
       ApiResponse.error('Order must have at least one line', 400)
     );
   }
+
+  // Validate payment method
+  const validPaymentMethods = ['ONLINE', 'COD'];
+  const finalPaymentMethod = payment_method && validPaymentMethods.includes(payment_method) 
+    ? payment_method 
+    : 'ONLINE';
 
   // Fetch items and auto-assign prices from base_sell_price if not provided
   const Item = require('../models/Item');
@@ -297,6 +303,9 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
   const orderCount = await InternalOrder.countDocuments();
   const orderNo = `SO-${String(orderCount + 1).padStart(4, '0')}`;
 
+  // Set payment status based on payment method
+  const paymentStatus = finalPaymentMethod === 'COD' ? 'COD_PENDING' : 'UNPAID';
+
   // Create order
   const order = await InternalOrder.create({
     _id: `ord_${Date.now()}`,
@@ -307,7 +316,9 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     created_by: req.user.id,
     total_amount: totalAmount,
     currency: 'VND',
-    is_urgent: is_urgent || false
+    is_urgent: is_urgent || false,
+    payment_method: finalPaymentMethod,
+    payment_status: paymentStatus
   });
 
   // Create order lines
@@ -351,7 +362,7 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     await notificationController.createNotificationInternal({
       recipient_role: 'SUPPLY_COORDINATOR',
       title: 'DƠN HÀNG KHẨN CẤP!',
-      message: `Cửa hàng ${populatedOrder.store_org_unit_id.name} vừa tạo một đơn hàng khẩn cấp: ${order.order_no}`,
+      message: `Cửa hàng ${populatedOrder?.store_org_unit_id?.name || 'Unknown'} vừa tạo một đơn hàng khẩn cấp: ${order.order_no}`,
       type: 'URGENT',
       ref_type: 'ORDER',
       ref_id: order._id
@@ -370,7 +381,19 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     await notificationController.createNotificationInternal({
       recipient_role: 'SUPPLY_COORDINATOR',
       title: 'Đơn hàng mới',
-      message: `Có đơn hàng mới ${order.order_no} từ ${populatedOrder.store_org_unit_id.name}`,
+      message: `Có đơn hàng mới ${order.order_no} từ ${populatedOrder?.store_org_unit_id?.name || 'Unknown'}`,
+      type: 'INFO',
+      ref_type: 'ORDER',
+      ref_id: order._id
+    });
+  }
+
+  // Additional notification for COD orders
+  if (finalPaymentMethod === 'COD') {
+    await notificationController.createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Đơn hàng COD mới',
+      message: `Đơn hàng ${order.order_no} sử dụng thanh toán COD (${totalAmount.toLocaleString()} VND)`,
       type: 'INFO',
       ref_type: 'ORDER',
       ref_id: order._id
@@ -381,7 +404,7 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     ApiResponse.success({
       ...populatedOrder.toObject(),
       lines: orderLines
-    }, 'Order created successfully', 201)
+    }, `Order created successfully${finalPaymentMethod === 'COD' ? ' with COD payment' : ''}`, 201)
   );
 });
 

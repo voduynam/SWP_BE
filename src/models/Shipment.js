@@ -42,6 +42,23 @@ const shipmentSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  cod_amount: {
+    type: Number,
+    default: 0
+  },
+  cod_collected_amount: {
+    type: Number,
+    default: 0
+  },
+  cod_collected_at: {
+    type: Date,
+    default: null
+  },
+  cod_collected_by: {
+    type: String,
+    ref: 'AppUser',
+    default: null
+  },
   created_by: {
     type: String,
     required: true,

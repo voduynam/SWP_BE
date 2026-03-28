@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const returnRequestController = require('../controllers/returnRequest.controller');
 const { protect, authorize } = require('../middlewares/auth');
+const uploadReturnEvidence = require('../middlewares/uploadReturnEvidence');
 
 /**
  * @swagger
@@ -51,10 +52,52 @@ router.get('/:id', returnRequestController.getReturnRequest);
  * @swagger
  * /api/return-requests:
  *   post:
- *     summary: Create new return request
+ *     summary: Create new return request with evidence photos
  *     tags: [Return Requests]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               store_org_unit_id:
+ *                 type: string
+ *               goods_receipt_id:
+ *                 type: string
+ *               reason:
+ *                 type: string
+ *               lines:
+ *                 type: string
+ *                 description: JSON string of return lines
+ *               evidence_photos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 maxItems: 5
+ *     responses:
+ *       201:
+ *         description: Return request created with evidence photos
+ */
+router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), uploadReturnEvidence, returnRequestController.createReturnRequest);
+
+/**
+ * @swagger
+ * /api/return-requests/{id}/review:
+ *   put:
+ *     summary: Manager approve or reject return request
+ *     tags: [Return Requests]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
  *     requestBody:
  *       required: true
  *       content:
@@ -62,25 +105,23 @@ router.get('/:id', returnRequestController.getReturnRequest);
  *           schema:
  *             type: object
  *             properties:
- *               orig_org_unit_id:
+ *               action:
  *                 type: string
- *               dest_org_unit_id:
+ *                 enum: [APPROVE, REJECT]
+ *               rejection_reason:
  *                 type: string
- *               lines:
- *                 type: array
- *                 items:
- *                   type: object
+ *                 description: Required when action is REJECT
  *     responses:
- *       201:
- *         description: Return request created
+ *       200:
+ *         description: Return request reviewed successfully
  */
-router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), returnRequestController.createReturnRequest);
+router.put('/:id/review', authorize('MANAGER', 'ADMIN'), returnRequestController.reviewReturnRequest);
 
 /**
  * @swagger
  * /api/return-requests/{id}/status:
  *   put:
- *     summary: Update return request status
+ *     summary: Update return request status (legacy endpoint)
  *     tags: [Return Requests]
  *     security:
  *       - bearerAuth: []
@@ -99,7 +140,7 @@ router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), returnRequestCont
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [PENDING, APPROVED, REJECTED, PROCESSED]
+ *                 enum: [PENDING, APPROVED, REJECTED, PROCESSING, COMPLETED, CANCELLED]
  *     responses:
  *       200:
  *         description: Status updated

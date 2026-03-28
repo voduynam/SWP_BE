@@ -58,6 +58,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Static: ảnh giao hàng lưu local (uploads/delivery-proof)
 app.use('/uploads', express.static('uploads'));
 
+// Static: serve public files (map viewer, etc.)
+app.use('/public', express.static('public'));
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.status(200).json({

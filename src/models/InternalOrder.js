@@ -54,8 +54,13 @@ const internalOrderSchema = new mongoose.Schema({
   },
   payment_status: {
     type: String,
-    enum: ['UNPAID', 'PAID', 'FAILED', 'CANCELLED'],
+    enum: ['UNPAID', 'PAID', 'FAILED', 'CANCELLED', 'COD_PENDING', 'COD_COLLECTED', 'COD_CONFIRMED'],
     default: 'UNPAID'
+  },
+  payment_method: {
+    type: String,
+    enum: ['ONLINE', 'COD'],
+    default: 'ONLINE'
   },
   created_at: {
     type: Date,
