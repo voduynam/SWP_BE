@@ -281,6 +281,31 @@ exports.updateProductionOrderStatus = asyncHandler(async (req, res) => {
   order.updated_at = new Date();
   await order.save();
 
+  // --- [PERFORMANCE TRACKING] ---
+  // When production order is completed, check for performance issues
+  if (status === 'DONE') {
+    const PerformanceService = require('../services/performanceService');
+    
+    // Get production lines to check for shortages
+    const ProductionOrderLine = require('../models/ProductionOrderLine');
+    const productionLines = await ProductionOrderLine.find({ prod_order_id: order._id });
+    
+    // Check for production shortage
+    await PerformanceService.detectProductionShortage(order, productionLines);
+    
+    // Check for quality issues (waste transactions)
+    const WasteTransaction = require('../models/WasteTransaction');
+    const wasteTransactions = await WasteTransaction.find({
+      ref_type: 'PRODUCTION_ORDER',
+      ref_id: order._id,
+      waste_category: 'PRODUCTION_WASTE'
+    });
+    
+    if (wasteTransactions.length > 0) {
+      await PerformanceService.detectProductionQuality(order, wasteTransactions);
+    }
+  }
+
   const populatedOrder = await ProductionOrder.findById(order._id)
     .populate('created_by', 'username full_name');
 

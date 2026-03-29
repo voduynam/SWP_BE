@@ -226,6 +226,11 @@ exports.createShipment = asyncHandler(async (req, res) => {
     .populate('to_location_id', 'name code')
     .populate('created_by', 'username full_name');
 
+  // --- [PERFORMANCE TRACKING] ---
+  // Create coordinator assignment for this shipment
+  const PerformanceService = require('../services/performanceService');
+  await PerformanceService.createCoordinatorAssignment(shipment);
+
   return res.status(201).json(
     ApiResponse.success({
       ...populatedShipment.toObject(),
@@ -567,6 +572,11 @@ exports.collectCOD = asyncHandler(async (req, res) => {
     ref_type: 'ORDER',
     ref_id: payment._id
   });
+
+  // --- [PERFORMANCE TRACKING] ---
+  // Check for COD collection errors
+  const PerformanceService = require('../services/performanceService');
+  await PerformanceService.detectCODErrors(shipment, payment);
 
   const populatedShipment = await Shipment.findById(shipment._id)
     .populate('order_id', 'order_no payment_method payment_status')
