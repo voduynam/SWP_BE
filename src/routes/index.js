@@ -14,19 +14,14 @@ const recipeRoutes = require('./recipe.routes');
 const lotRoutes = require('./lot.routes');
 const masterDataRoutes = require('./masterData.routes');
 const returnRequestRoutes = require('./returnRequest.routes');
-const materialRequestRoutes = require('./materialRequest.routes');
-const productionVarianceCostRoutes = require('./productionVarianceCost.routes');
-const wasteReportRoutes = require('./wasteReport.routes');
 const alertRoutes = require('./alert.routes');
 const dashboardRoutes = require('./dashboard.routes');
 const deliveryRouteRoutes = require('./deliveryRoute.routes');
 const consolidatedOrderRoutes = require('./consolidatedOrder.routes');
 const exceptionRoutes = require('./exception.routes');
 const performanceMetricsRoutes = require('./performanceMetrics.routes');
-const performanceRoutes = require('./performance.routes');
 const notificationRoutes = require('./notification.routes');
 const paymentRoutes = require('./payment.routes');
-const locationRoutes = require('./location.routes');
 
 // Define routes
 router.use('/auth', authRoutes);
@@ -41,19 +36,14 @@ router.use('/recipes', recipeRoutes);
 router.use('/lots', lotRoutes);
 router.use('/master-data', masterDataRoutes);
 router.use('/return-requests', returnRequestRoutes);
-router.use('/material-requests', materialRequestRoutes);
-router.use('/production-variance-costs', productionVarianceCostRoutes);
-router.use('/waste-reports', wasteReportRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/delivery-routes', deliveryRouteRoutes);
 router.use('/consolidated-orders', consolidatedOrderRoutes);
 router.use('/exceptions', exceptionRoutes);
 router.use('/performance-metrics', performanceMetricsRoutes);
-router.use('/performance', performanceRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/payments', paymentRoutes);
-router.use('/locations', locationRoutes);
 
 // Default route
 router.get('/', (req, res) => {
@@ -73,18 +63,14 @@ router.get('/', (req, res) => {
       lots: '/api/lots',
       'master-data': '/api/master-data',
       'return-requests': '/api/return-requests',
-      'material-requests': '/api/material-requests',
-      'production-variance-costs': '/api/production-variance-costs',
-      'waste-reports': '/api/waste-reports',
       alerts: '/api/alerts',
       dashboard: '/api/dashboard',
       'delivery-routes': '/api/delivery-routes',
       'consolidated-orders': '/api/consolidated-orders',
       exceptions: '/api/exceptions',
       'performance-metrics': '/api/performance-metrics',
-      performance: '/api/performance',
-      payments: '/api/payments',
-      locations: '/api/locations'
+      notifications: '/api/notifications',
+      payments: '/api/payments'
     }
   });
 });

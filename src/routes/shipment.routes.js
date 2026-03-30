@@ -3,7 +3,6 @@ const router = express.Router();
 const shipmentController = require('../controllers/shipment.controller');
 const { protect, authorize } = require('../middlewares/auth');
 const upload = require('../middlewares/uploadDeliveryImage');
-const optionalUpload = require('../middlewares/optionalUpload');
 
 /**
  * @swagger
@@ -405,6 +404,6 @@ router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
  *       400:
  *         description: Bad request - Evidence photos/videos required for issues
  */
-router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), optionalUpload('evidence_photos', 5), shipmentController.confirmReceipt);
+router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), shipmentController.confirmReceipt);
 
 module.exports = router;
