@@ -59,6 +59,37 @@ const shipmentSchema = new mongoose.Schema({
     ref: 'AppUser',
     default: null
   },
+  cod_collection_notes: {
+    type: String,
+    default: ''
+  },
+  // COD evidence photos
+  cod_evidence_photos: [{
+    url: String,
+    filename: String,
+    uploaded_at: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  cod_status: {
+    type: String,
+    enum: ['PENDING', 'COLLECTED', 'CONFIRMED', 'DISPUTED'],
+    default: 'PENDING'
+  },
+  cod_confirmed_by: {
+    type: String,
+    ref: 'AppUser',
+    default: null
+  },
+  cod_confirmed_at: {
+    type: Date,
+    default: null
+  },
+  cod_manager_notes: {
+    type: String,
+    default: ''
+  },
   // Staff receipt confirmation fields
   received_by_staff: {
     type: String,

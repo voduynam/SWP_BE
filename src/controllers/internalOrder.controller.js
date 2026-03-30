@@ -252,6 +252,8 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     ? payment_method 
     : 'ONLINE';
 
+
+
   // Fetch items and auto-assign prices from base_sell_price if not provided
   const Item = require('../models/Item');
   const processedLines = await Promise.all(
@@ -319,6 +321,14 @@ exports.createInternalOrder = asyncHandler(async (req, res) => {
     is_urgent: is_urgent || false,
     payment_method: finalPaymentMethod,
     payment_status: paymentStatus
+  });
+
+  console.log('🔍 DEBUG - Order created in database:', {
+    order_id: order._id,
+    payment_method_saved: order.payment_method,
+    payment_status_saved: order.payment_status,
+    total_amount: order.total_amount,
+    order_no: order.order_no
   });
 
   // Create order lines
@@ -663,5 +673,302 @@ exports.createProductionFromOrder = asyncHandler(async (req, res) => {
       ...populatedOrder.toObject(),
       lines: createdLines
     }, 'Production order created successfully from internal order', 201)
+  );
+});
+// @desc    Fix order status after cancelled shipment
+// @route   PUT /api/internal-orders/:id/fix-status
+// @access  Private (Manager, Admin)
+exports.fixOrderStatusAfterCancelledShipment = asyncHandler(async (req, res) => {
+  const order = await InternalOrder.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json(
+      ApiResponse.error('Order not found', 404)
+    );
+  }
+
+  // Check if there are any cancelled shipments for this order
+  const Shipment = require('../models/Shipment');
+  const cancelledShipments = await Shipment.find({
+    order_id: order._id,
+    status: 'CANCELLED'
+  });
+
+  if (cancelledShipments.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('No cancelled shipments found for this order', 400)
+    );
+  }
+
+  // Check if order status is incorrectly showing as SHIPPED/DELIVERED
+  if (!['SHIPPED', 'DELIVERED'].includes(order.status)) {
+    return res.status(400).json(
+      ApiResponse.error('Order status does not need fixing', 400)
+    );
+  }
+
+  // Revert order status to PROCESSING
+  order.status = 'PROCESSING';
+  order.updated_at = new Date();
+  await order.save();
+
+  // Restore inventory for cancelled shipments that were dispatched
+  let inventoryRestored = false;
+  for (const cancelledShipment of cancelledShipments) {
+    // Check if this shipment was dispatched (has TRANSFER_OUT transactions)
+    const InventoryTransaction = require('../models/InventoryTransaction');
+    const dispatchTransactions = await InventoryTransaction.find({
+      ref_type: 'SHIPMENT',
+      ref_id: cancelledShipment._id,
+      txn_type: 'TRANSFER_OUT'
+    });
+
+    if (dispatchTransactions.length > 0) {
+      // Check if inventory was already restored
+      const restorationTransactions = await InventoryTransaction.find({
+        ref_type: 'SHIPMENT_CANCELLED',
+        ref_id: cancelledShipment._id,
+        txn_type: 'TRANSFER_IN'
+      });
+
+      if (restorationTransactions.length === 0) {
+        // Restore inventory manually here instead of importing from shipment controller
+        await restoreInventoryFromCancelledShipmentInternal(cancelledShipment._id, req.user.id);
+        inventoryRestored = true;
+      }
+    }
+  }
+
+  // Create notification about the fix
+  const notificationController = require('./notification.controller');
+  const message = inventoryRestored 
+    ? `Đơn hàng ${order.order_no} đã được chuyển về trạng thái "Đang xử lý" và tồn kho đã được hoàn trả do có phiếu giao hàng bị hủy.`
+    : `Đơn hàng ${order.order_no} đã được chuyển về trạng thái "Đang xử lý" do có phiếu giao hàng bị hủy.`;
+
+  await notificationController.createNotificationInternal({
+    recipient_role: 'MANAGER',
+    title: 'Trạng thái đơn hàng đã được sửa',
+    message: message,
+    type: 'INFO',
+    ref_type: 'ORDER',
+    ref_id: order._id
+  });
+
+  const populatedOrder = await InternalOrder.findById(order._id)
+    .populate('store_org_unit_id', 'name code type')
+    .populate('created_by', 'username full_name');
+
+  return res.status(200).json(
+    ApiResponse.success(
+      { 
+        order: populatedOrder, 
+        inventory_restored: inventoryRestored,
+        cancelled_shipments_count: cancelledShipments.length 
+      }, 
+      inventoryRestored 
+        ? 'Order status fixed and inventory restored successfully'
+        : 'Order status fixed successfully'
+    )
+  );
+});
+
+/**
+ * Restore inventory when a shipment is cancelled after being dispatched
+ * This reverses the TRANSFER_OUT transactions created during dispatch
+ */
+async function restoreInventoryFromCancelledShipmentInternal(shipmentId, userId) {
+  const InventoryBalance = require('../models/InventoryBalance');
+  const InventoryTransaction = require('../models/InventoryTransaction');
+  const ShipmentLine = require('../models/ShipmentLine');
+  const ShipmentLineLot = require('../models/ShipmentLineLot');
+  const Shipment = require('../models/Shipment');
+
+  try {
+    const shipment = await Shipment.findById(shipmentId);
+    if (!shipment) return;
+
+    const shipmentLines = await ShipmentLine.find({ shipment_id: shipmentId });
+
+    for (const line of shipmentLines) {
+      const shipmentLineLots = await ShipmentLineLot.find({ shipment_line_id: line._id });
+
+      // If no lots are assigned, restore base item balance
+      if (shipmentLineLots.length === 0) {
+        let balance = await InventoryBalance.findOne({
+          location_id: shipment.from_location_id,
+          item_id: line.item_id,
+          lot_id: null
+        });
+
+        if (!balance) {
+          // Create balance if it doesn't exist
+          balance = await InventoryBalance.create({
+            location_id: shipment.from_location_id,
+            item_id: line.item_id,
+            lot_id: null,
+            qty_on_hand: 0,
+            qty_reserved: 0
+          });
+        }
+
+        // Restore quantity
+        balance.qty_on_hand += line.qty;
+        balance.updated_at = new Date();
+        await balance.save();
+
+        // Record restoration transaction
+        await InventoryTransaction.create({
+          txn_time: new Date(),
+          location_id: shipment.from_location_id,
+          item_id: line.item_id,
+          lot_id: null,
+          qty: line.qty, // Positive quantity for restoration
+          uom_id: line.uom_id,
+          txn_type: 'TRANSFER_IN',
+          ref_type: 'SHIPMENT_CANCELLED',
+          ref_id: shipmentId,
+          created_by: userId,
+          notes: `Inventory restored from cancelled shipment ${shipment.shipment_no}`
+        });
+      } else {
+        // Restore lot-specific balances
+        for (const lineLot of shipmentLineLots) {
+          let balance = await InventoryBalance.findOne({
+            location_id: shipment.from_location_id,
+            item_id: line.item_id,
+            lot_id: lineLot.lot_id
+          });
+
+          if (!balance) {
+            // Create balance if it doesn't exist
+            balance = await InventoryBalance.create({
+              location_id: shipment.from_location_id,
+              item_id: line.item_id,
+              lot_id: lineLot.lot_id,
+              qty_on_hand: 0,
+              qty_reserved: 0
+            });
+          }
+
+          // Restore quantity
+          balance.qty_on_hand += lineLot.qty;
+          balance.updated_at = new Date();
+          await balance.save();
+
+          // Record restoration transaction
+          await InventoryTransaction.create({
+            txn_time: new Date(),
+            location_id: shipment.from_location_id,
+            item_id: line.item_id,
+            lot_id: lineLot.lot_id,
+            qty: lineLot.qty, // Positive quantity for restoration
+            uom_id: line.uom_id,
+            txn_type: 'TRANSFER_IN',
+            ref_type: 'SHIPMENT_CANCELLED',
+            ref_id: shipmentId,
+            created_by: userId,
+            notes: `Inventory restored from cancelled shipment ${shipment.shipment_no}`
+          });
+        }
+      }
+    }
+
+    console.log(`Successfully restored inventory for cancelled shipment ${shipment.shipment_no}`);
+  } catch (error) {
+    console.error('Error restoring inventory from cancelled shipment:', error);
+    throw error;
+  }
+}
+// @desc    Manually restore inventory for cancelled shipments
+// @route   POST /api/internal-orders/:id/restore-inventory
+// @access  Private (Manager, Admin)
+exports.manuallyRestoreInventoryForCancelledShipments = asyncHandler(async (req, res) => {
+  const order = await InternalOrder.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json(
+      ApiResponse.error('Order not found', 404)
+    );
+  }
+
+  // Find all shipments for this order (both cancelled and active)
+  const Shipment = require('../models/Shipment');
+  const allShipments = await Shipment.find({
+    order_id: order._id
+  });
+
+  if (allShipments.length === 0) {
+    return res.status(400).json(
+      ApiResponse.error('No shipments found for this order', 400)
+    );
+  }
+
+  const InventoryTransaction = require('../models/InventoryTransaction');
+  let restoredShipments = [];
+  let alreadyRestoredShipments = [];
+  let notDispatchedShipments = [];
+
+  for (const shipment of allShipments) {
+    // Check if this shipment was dispatched (has TRANSFER_OUT transactions)
+    const dispatchTransactions = await InventoryTransaction.find({
+      ref_type: 'SHIPMENT',
+      ref_id: shipment._id,
+      txn_type: 'TRANSFER_OUT'
+    });
+
+    if (dispatchTransactions.length === 0) {
+      notDispatchedShipments.push(shipment.shipment_no);
+      continue;
+    }
+
+    // Check if inventory was already restored
+    const restorationTransactions = await InventoryTransaction.find({
+      ref_type: 'SHIPMENT_CANCELLED',
+      ref_id: shipment._id,
+      txn_type: 'TRANSFER_IN'
+    });
+
+    if (restorationTransactions.length > 0) {
+      alreadyRestoredShipments.push(shipment.shipment_no);
+      continue;
+    }
+
+    // Restore inventory for this shipment
+    try {
+      await restoreInventoryFromCancelledShipmentInternal(shipment._id, req.user.id);
+      restoredShipments.push({
+        shipment_no: shipment.shipment_no,
+        status: shipment.status,
+        dispatch_transactions: dispatchTransactions.length
+      });
+    } catch (error) {
+      console.error(`Failed to restore inventory for shipment ${shipment.shipment_no}:`, error);
+    }
+  }
+
+  // Create notification about the restoration
+  if (restoredShipments.length > 0) {
+    const notificationController = require('./notification.controller');
+    await notificationController.createNotificationInternal({
+      recipient_role: 'MANAGER',
+      title: 'Tồn kho đã được hoàn trả thủ công',
+      message: `Đã hoàn trả tồn kho cho ${restoredShipments.length} phiếu giao hàng của đơn ${order.order_no}. Chi tiết: ${restoredShipments.map(s => s.shipment_no).join(', ')}`,
+      type: 'INFO',
+      ref_type: 'ORDER',
+      ref_id: order._id
+    });
+  }
+
+  return res.status(200).json(
+    ApiResponse.success({
+      order_no: order.order_no,
+      total_shipments: allShipments.length,
+      restored_shipments: restoredShipments,
+      already_restored_shipments: alreadyRestoredShipments,
+      not_dispatched_shipments: notDispatchedShipments,
+      summary: {
+        restored_count: restoredShipments.length,
+        already_restored_count: alreadyRestoredShipments.length,
+        not_dispatched_count: notDispatchedShipments.length
+      }
+    }, `Successfully restored inventory for ${restoredShipments.length} shipments`)
   );
 });

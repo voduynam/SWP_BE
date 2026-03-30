@@ -489,4 +489,44 @@ router.post('/:id/lines', internalOrderController.addOrderLine);
  */
 router.post('/:id/create-production', authorize('CHEF', 'MANAGER', 'ADMIN'), internalOrderController.createProductionFromOrder);
 
+/**
+ * @swagger
+ * /api/internal-orders/{id}/fix-status:
+ *   put:
+ *     summary: Fix order status after cancelled shipment
+ *     tags: [Internal Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order status fixed successfully
+ */
+router.put('/:id/fix-status', authorize('MANAGER', 'ADMIN'), internalOrderController.fixOrderStatusAfterCancelledShipment);
+
+/**
+ * @swagger
+ * /api/internal-orders/{id}/restore-inventory:
+ *   post:
+ *     summary: Manually restore inventory for cancelled shipments
+ *     tags: [Internal Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Inventory restored successfully
+ */
+router.post('/:id/restore-inventory', authorize('MANAGER', 'ADMIN'), internalOrderController.manuallyRestoreInventoryForCancelledShipments);
+
 module.exports = router;

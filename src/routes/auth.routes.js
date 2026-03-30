@@ -406,4 +406,9 @@ router.post('/send-password-setup/:userId', protect, authorize('ADMIN'), authCon
 // @access  Public
 router.post('/set-password', authController.setPassword);
 
+// @route   POST /api/auth/refresh-token
+// @desc    Refresh access token using refresh token from cookie
+// @access  Public
+router.post('/refresh-token', authController.refreshToken);
+
 module.exports = router;

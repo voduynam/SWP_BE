@@ -131,6 +131,12 @@ exports.getLowStockAlerts = asyncHandler(async (req, res) => {
   // Group by location and item (sum all lots)
   const itemBalances = {};
   for (const balance of balances) {
+    // Skip if location_id or item_id is null/undefined
+    if (!balance.location_id || !balance.item_id) {
+      console.warn('Skipping balance with null location_id or item_id:', balance._id);
+      continue;
+    }
+    
     const key = `${balance.location_id._id}_${balance.item_id._id}`;
     if (!itemBalances[key]) {
       itemBalances[key] = {
@@ -203,40 +209,81 @@ exports.getLowStockAlerts = asyncHandler(async (req, res) => {
 exports.getAlertsSummary = asyncHandler(async (req, res) => {
   const { location_id } = req.query;
 
-  // Get expiry alerts
-  const expiryReq = { ...req, query: { ...req.query, days_threshold: 7 } };
-  const expiryResult = await exports.getExpiryAlerts(expiryReq, { status: () => ({ json: (data) => data }) });
-  const expiryData = expiryResult.data;
+  try {
+    // Get expiry alerts - call the function directly and handle the response
+    let expiryData = { total: 0, summary: { expired: 0, critical: 0, high: 0, medium: 0 }, alerts: [] };
+    try {
+      const expiryReq = { ...req, query: { ...req.query, days_threshold: 7 } };
+      const mockRes = { 
+        status: () => ({ 
+          json: (data) => {
+            if (data && data.data) {
+              return data.data;
+            }
+            return data;
+          }
+        })
+      };
+      const expiryResult = await exports.getExpiryAlerts(expiryReq, mockRes);
+      if (expiryResult && typeof expiryResult === 'object') {
+        expiryData = expiryResult;
+      }
+    } catch (error) {
+      console.error('Error getting expiry alerts:', error);
+    }
 
-  // Get low stock alerts
-  const lowStockResult = await exports.getLowStockAlerts(req, { status: () => ({ json: (data) => data }) });
-  const lowStockData = lowStockResult.data;
+    // Get low stock alerts
+    let lowStockData = { total: 0, summary: { critical: 0, high: 0, medium: 0 }, alerts: [] };
+    try {
+      const mockRes = { 
+        status: () => ({ 
+          json: (data) => {
+            if (data && data.data) {
+              return data.data;
+            }
+            return data;
+          }
+        })
+      };
+      const lowStockResult = await exports.getLowStockAlerts(req, mockRes);
+      if (lowStockResult && typeof lowStockResult === 'object') {
+        lowStockData = lowStockResult;
+      }
+    } catch (error) {
+      console.error('Error getting low stock alerts:', error);
+    }
 
-  const summary = {
-    total_alerts: expiryData.total + lowStockData.total,
-    expiry_alerts: {
-      total: expiryData.total,
-      expired: expiryData.summary.expired,
-      critical: expiryData.summary.critical,
-      high: expiryData.summary.high,
-      medium: expiryData.summary.medium
-    },
-    low_stock_alerts: {
-      total: lowStockData.total,
-      critical: lowStockData.summary.critical,
-      high: lowStockData.summary.high,
-      medium: lowStockData.summary.medium
-    },
-    recent_alerts: [
-      ...expiryData.alerts.slice(0, 5),
-      ...lowStockData.alerts.slice(0, 5)
-    ].sort((a, b) => {
-      const severityOrder = { EXPIRED: 0, CRITICAL: 1, HIGH: 2, MEDIUM: 3 };
-      return severityOrder[a.severity] - severityOrder[b.severity];
-    }).slice(0, 10)
-  };
+    const summary = {
+      total_alerts: (expiryData.total || 0) + (lowStockData.total || 0),
+      expiry_alerts: {
+        total: expiryData.total || 0,
+        expired: expiryData.summary?.expired || 0,
+        critical: expiryData.summary?.critical || 0,
+        high: expiryData.summary?.high || 0,
+        medium: expiryData.summary?.medium || 0
+      },
+      low_stock_alerts: {
+        total: lowStockData.total || 0,
+        critical: lowStockData.summary?.critical || 0,
+        high: lowStockData.summary?.high || 0,
+        medium: lowStockData.summary?.medium || 0
+      },
+      recent_alerts: [
+        ...(expiryData.alerts || []).slice(0, 5),
+        ...(lowStockData.alerts || []).slice(0, 5)
+      ].sort((a, b) => {
+        const severityOrder = { EXPIRED: 0, CRITICAL: 1, HIGH: 2, MEDIUM: 3 };
+        return (severityOrder[a.severity] || 4) - (severityOrder[b.severity] || 4);
+      }).slice(0, 10)
+    };
 
-  return res.status(200).json(
-    ApiResponse.success(summary)
-  );
+    return res.status(200).json(
+      ApiResponse.success(summary)
+    );
+  } catch (error) {
+    console.error('Error in getAlertsSummary:', error);
+    return res.status(500).json(
+      ApiResponse.error('Failed to get alerts summary', 500)
+    );
+  }
 });

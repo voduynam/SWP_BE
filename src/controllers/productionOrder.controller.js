@@ -120,12 +120,43 @@ exports.getProductionOrders = asyncHandler(async (req, res) => {
     if (end_date) filter.planned_start.$lte = new Date(end_date);
   }
 
-  const orders = await ProductionOrder.find(filter)
-    .populate('created_by', 'username full_name')
-    .skip(skip)
-    .limit(limit)
-    .sort({ planned_start: -1 });
+  // Use aggregation to include line summaries
+  const pipeline = [
+    { $match: filter },
+    {
+      $lookup: {
+        from: 'production_order_line',
+        localField: '_id',
+        foreignField: 'prod_order_id',
+        as: 'lines'
+      }
+    },
+    {
+      $lookup: {
+        from: 'app_user',
+        localField: 'created_by',
+        foreignField: '_id',
+        as: 'created_by',
+        pipeline: [
+          { $project: { username: 1, full_name: 1 } }
+        ]
+      }
+    },
+    {
+      $addFields: {
+        created_by: { $arrayElemAt: ['$created_by', 0] },
+        planned_qty: { $sum: '$lines.planned_qty' },
+        actual_qty: { $sum: '$lines.actual_qty' },
+        line_count: { $size: '$lines' }
+      }
+    },
+    { $project: { lines: 0 } }, // Remove lines array to keep response light
+    { $sort: { planned_start: -1 } },
+    { $skip: skip },
+    { $limit: limit }
+  ];
 
+  const orders = await ProductionOrder.aggregate(pipeline);
   const total = await ProductionOrder.countDocuments(filter);
 
   return res.status(200).json(
@@ -285,14 +316,14 @@ exports.updateProductionOrderStatus = asyncHandler(async (req, res) => {
   // When production order is completed, check for performance issues
   if (status === 'DONE') {
     const PerformanceService = require('../services/performanceService');
-    
+
     // Get production lines to check for shortages
     const ProductionOrderLine = require('../models/ProductionOrderLine');
     const productionLines = await ProductionOrderLine.find({ prod_order_id: order._id });
-    
+
     // Check for production shortage
     await PerformanceService.detectProductionShortage(order, productionLines);
-    
+
     // Check for quality issues (waste transactions)
     const WasteTransaction = require('../models/WasteTransaction');
     const wasteTransactions = await WasteTransaction.find({
@@ -300,7 +331,7 @@ exports.updateProductionOrderStatus = asyncHandler(async (req, res) => {
       ref_id: order._id,
       waste_category: 'PRODUCTION_WASTE'
     });
-    
+
     if (wasteTransactions.length > 0) {
       await PerformanceService.detectProductionQuality(order, wasteTransactions);
     }
@@ -516,10 +547,27 @@ exports.recordOutput = asyncHandler(async (req, res) => {
 exports.compensateProductionShortage = asyncHandler(async (req, res) => {
   const { shortage_items, reason, priority } = req.body;
 
+  console.log('Received compensation request:', JSON.stringify(req.body, null, 2));
+
   if (!shortage_items || shortage_items.length === 0) {
     return res.status(400).json(
       ApiResponse.error('Shortage items are required', 400)
     );
+  }
+
+  // Validate shortage_items structure
+  for (let i = 0; i < shortage_items.length; i++) {
+    const item = shortage_items[i];
+    if (!item.item_id) {
+      return res.status(400).json(
+        ApiResponse.error(`Missing item_id in shortage_items[${i}]. Received: ${JSON.stringify(item)}`, 400)
+      );
+    }
+    if (!item.shortage_qty || item.shortage_qty <= 0) {
+      return res.status(400).json(
+        ApiResponse.error(`Invalid shortage_qty in shortage_items[${i}]. Must be > 0. Received: ${item.shortage_qty}`, 400)
+      );
+    }
   }
 
   const originalOrder = await ProductionOrder.findById(req.params.id)
@@ -541,7 +589,7 @@ exports.compensateProductionShortage = asyncHandler(async (req, res) => {
   const InventoryBalance = require('../models/InventoryBalance');
   const Location = require('../models/Location');
   const Item = require('../models/Item');
-  
+
   let totalCompensationCost = 0;
   const materialRequirements = [];
   const insufficientMaterials = [];
@@ -583,6 +631,12 @@ exports.compensateProductionShortage = asyncHandler(async (req, res) => {
   // Create compensating production order lines and check materials
   const compensatingLines = await Promise.all(
     shortage_items.map(async (item, index) => {
+      console.log(`Processing shortage item ${index}:`, JSON.stringify(item, null, 2));
+      
+      if (!item.item_id) {
+        throw new Error(`Missing item_id in shortage_items[${index}]. Received: ${JSON.stringify(item)}`);
+      }
+
       // Get the original line to copy recipe and other details
       const originalLine = await ProductionOrderLine.findOne({
         prod_order_id: originalOrder._id,
@@ -617,7 +671,7 @@ exports.compensateProductionShortage = asyncHandler(async (req, res) => {
         });
 
         const availableQty = currentStock?.qty_on_hand || 0;
-        
+
         materialRequirements.push({
           material_item_id: recipeLine.material_item_id._id,
           material_name: recipeLine.material_item_id.name,
@@ -660,7 +714,7 @@ exports.compensateProductionShortage = asyncHandler(async (req, res) => {
   if (insufficientMaterials.length > 0) {
     const MaterialRequest = require('../models/MaterialRequest');
     const MaterialRequestLine = require('../models/MaterialRequestLine');
-    
+
     const requestCount = await MaterialRequest.countDocuments();
     const requestNo = `MR-COMP-${String(requestCount + 1).padStart(4, '0')}`;
 
@@ -714,7 +768,7 @@ exports.compensateProductionShortage = asyncHandler(async (req, res) => {
   // Create notifications
   try {
     const { createNotificationInternal } = require('./notification.controller');
-    
+
     // Notify kitchen staff
     await createNotificationInternal({
       recipient_role: 'CHEF',
@@ -983,7 +1037,7 @@ exports.executeCompensatingProduction = asyncHandler(async (req, res) => {
   // Create production variance cost record
   const originalOrder = await ProductionOrder.findById(compensatingOrder.compensating_for_order_id);
   const originalLines = await ProductionOrderLine.find({ prod_order_id: originalOrder._id });
-  
+
   const totalPlanned = originalLines.reduce((sum, line) => sum + (line.planned_qty || 0), 0);
   const totalActual = originalLines.reduce((sum, line) => sum + (line.actual_qty || 0), 0);
   const shortageQty = Math.max(0, totalPlanned - totalActual);
@@ -1007,7 +1061,7 @@ exports.executeCompensatingProduction = asyncHandler(async (req, res) => {
   // Create notifications
   try {
     const { createNotificationInternal } = require('./notification.controller');
-    
+
     // Notify manager about cost impact
     await createNotificationInternal({
       recipient_role: 'MANAGER',
@@ -1074,7 +1128,7 @@ exports.recordProductionWaste = asyncHandler(async (req, res) => {
   const Location = require('../models/Location');
 
   // Get kitchen location - use user's org_unit_id since production orders are created by kitchen staff
-  const kitchenLocation = await Location.findOne({ 
+  const kitchenLocation = await Location.findOne({
     org_unit_id: req.user.org_unit_id,
     status: 'ACTIVE'
   });
@@ -1120,7 +1174,7 @@ exports.recordProductionWaste = asyncHandler(async (req, res) => {
 
   // Notify manager if waste value is significant
   const totalWasteValue = wasteTransactions.reduce((sum, wt) => sum + wt.total_waste_value, 0);
-  
+
   if (totalWasteValue > 500000) { // > 500k VND
     try {
       const { createNotificationInternal } = require('./notification.controller');
@@ -1144,4 +1198,45 @@ exports.recordProductionWaste = asyncHandler(async (req, res) => {
       total_waste_value: totalWasteValue
     }, 'Production waste recorded successfully', 201)
   );
+});
+
+// @desc    Sync production outputs to inventory
+// @route   POST /api/production-orders/:id/sync-inventory
+// @access  Private (Chef, Manager, Admin)
+exports.syncProductionToInventory = asyncHandler(async (req, res) => {
+  const productionOrder = await ProductionOrder.findById(req.params.id)
+    .populate('created_by', 'username full_name org_unit_id');
+
+  if (!productionOrder) {
+    return res.status(404).json(
+      ApiResponse.error('Production order not found', 404)
+    );
+  }
+
+  if (productionOrder.status !== 'DONE') {
+    return res.status(400).json(
+      ApiResponse.error('Can only sync completed production orders', 400)
+    );
+  }
+
+  try {
+    // Use the existing sync function
+    await syncProductionOutputsToInventory({
+      prodOrderId: productionOrder._id,
+      orgUnitId: productionOrder.created_by?.org_unit_id?._id || productionOrder.created_by?.org_unit_id,
+      createdByUserId: req.user.id
+    });
+
+    return res.status(200).json(
+      ApiResponse.success(
+        { production_order_id: productionOrder._id },
+        'Production outputs synced to inventory successfully'
+      )
+    );
+  } catch (error) {
+    console.error('Error syncing production to inventory:', error);
+    return res.status(500).json(
+      ApiResponse.error('Failed to sync production outputs to inventory', 500)
+    );
+  }
 });

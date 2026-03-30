@@ -8,7 +8,7 @@ const ApiResponse = require('../utils/ApiResponse');
 // @route   GET /api/inventory/balances
 // @access  Private
 exports.getInventoryBalances = asyncHandler(async (req, res) => {
-  const { location_id, item_id, lot_id } = req.query;
+  const { location_id, item_id, lot_id, search } = req.query;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
@@ -17,6 +17,25 @@ exports.getInventoryBalances = asyncHandler(async (req, res) => {
   if (location_id) filter.location_id = location_id;
   if (item_id) filter.item_id = item_id;
   if (lot_id) filter.lot_id = lot_id;
+
+  if (search) {
+    const Item = require('../models/Item');
+    const Location = require('../models/Location');
+    const searchRegex = { $regex: search, $options: 'i' };
+    
+    const matchingItems = await Item.find({
+      $or: [{ name: searchRegex }, { sku: searchRegex }]
+    }).select('_id');
+    
+    const matchingLocs = await Location.find({
+      $or: [{ name: searchRegex }, { code: searchRegex }]
+    }).select('_id');
+
+    filter.$or = [
+      { item_id: { $in: matchingItems.map(i => i._id) } },
+      { location_id: { $in: matchingLocs.map(l => l._id) } }
+    ];
+  }
 
   // Filter by user's org unit locations if not admin/manager/supply coordinator
   if (
@@ -31,7 +50,7 @@ exports.getInventoryBalances = asyncHandler(async (req, res) => {
 
   const balances = await InventoryBalance.find(filter)
     .populate('location_id', 'name code org_unit_id')
-    .populate('item_id', 'sku name item_type')
+    .populate('item_id', 'sku name item_type cost_price')
     .populate('lot_id', 'lot_code mfg_date exp_date')
     .skip(skip)
     .limit(limit)
@@ -48,7 +67,7 @@ exports.getInventoryBalances = asyncHandler(async (req, res) => {
 // @route   GET /api/inventory/transactions
 // @access  Private
 exports.getInventoryTransactions = asyncHandler(async (req, res) => {
-  const { location_id, item_id, lot_id, txn_type, start_date, end_date } = req.query;
+  const { location_id, item_id, lot_id, txn_type, start_date, end_date, search } = req.query;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
@@ -62,6 +81,30 @@ exports.getInventoryTransactions = asyncHandler(async (req, res) => {
     filter.txn_time = {};
     if (start_date) filter.txn_time.$gte = new Date(start_date);
     if (end_date) filter.txn_time.$lte = new Date(end_date);
+  }
+
+  if (search) {
+    const Item = require('../models/Item');
+    const Location = require('../models/Location');
+    const searchRegex = { $regex: search, $options: 'i' };
+    
+    // Find matching items by name or SKU
+    const matchingItems = await Item.find({
+      $or: [{ name: searchRegex }, { sku: searchRegex }]
+    }).select('_id');
+    const itemIds = matchingItems.map(i => i._id);
+
+    // Find matching locations by name or code
+    const matchingLocs = await Location.find({
+      $or: [{ name: searchRegex }, { code: searchRegex }]
+    }).select('_id');
+    const locIds = matchingLocs.map(l => l._id);
+
+    filter.$or = [
+      { item_id: { $in: itemIds } },
+      { location_id: { $in: locIds } },
+      { notes: searchRegex }
+    ];
   }
 
   // Filter by user's org unit locations if not admin/manager/supply coordinator
@@ -130,7 +173,7 @@ exports.getInventorySummary = asyncHandler(async (req, res) => {
   const summary = {
     total_items: balances.length,
     total_value: balances.reduce((sum, b) => {
-      const itemValue = (b.item_id.cost_price || 0) * b.qty_on_hand;
+      const itemValue = (b.item_id?.cost_price || 0) * (b.qty_on_hand || 0);
       return sum + itemValue;
     }, 0),
     locations: {}
@@ -138,7 +181,9 @@ exports.getInventorySummary = asyncHandler(async (req, res) => {
 
   // Group by location
   balances.forEach(balance => {
-    const locId = balance.location_id._id;
+    const locId = balance.location_id?._id || balance.location_id;
+    if (!locId) return;
+    
     if (!summary.locations[locId]) {
       summary.locations[locId] = {
         location: balance.location_id,
@@ -148,7 +193,7 @@ exports.getInventorySummary = asyncHandler(async (req, res) => {
       };
     }
     summary.locations[locId].item_count++;
-    const itemValue = (balance.item_id.cost_price || 0) * balance.qty_on_hand;
+    const itemValue = (balance.item_id?.cost_price || 0) * (balance.qty_on_hand || 0);
     summary.locations[locId].total_value += itemValue;
     summary.locations[locId].items.push(balance);
   });
@@ -247,5 +292,115 @@ exports.adjustInventory = asyncHandler(async (req, res) => {
         currency: 'VND'
       }
     }, 'Inventory adjusted successfully with cost tracking', 201)
+  );
+});
+
+// @desc    Get inventory balances grouped by item and location
+// @route   GET /api/inventory/balances/grouped
+// @access  Private
+exports.getInventoryBalancesGrouped = asyncHandler(async (req, res) => {
+  const { location_id, search } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 15;
+  const skip = (page - 1) * limit;
+
+  const mongoose = require('mongoose');
+  const match = {};
+  
+  if (location_id) {
+    match.location_id = new mongoose.Types.ObjectId(location_id);
+  }
+
+  if (
+    !req.user.roles.includes('ADMIN') &&
+    !req.user.roles.includes('MANAGER') &&
+    !req.user.roles.includes('SUPPLY_COORDINATOR')
+  ) {
+    const userLocations = await Location.find({ org_unit_id: req.user.org_unit_id });
+    match.location_id = { $in: userLocations.map(l => l._id) };
+  }
+
+  if (search) {
+     const Item = require('../models/Item');
+     const searchRegex = { $regex: search, $options: 'i' };
+     const matchingItems = await Item.find({ $or: [{ name: searchRegex }, { sku: searchRegex }] }).select('_id');
+     const matchingLocs = await Location.find({ $or: [{ name: searchRegex }, { code: searchRegex }] }).select('_id');
+     match.$or = [
+       { item_id: { $in: matchingItems.map(i => i._id) } },
+       { location_id: { $in: matchingLocs.map(l => l._id) } }
+     ];
+  }
+
+  const pipeline = [
+    { $match: match },
+    {
+       $lookup: {
+         from: 'lot',
+         localField: 'lot_id',
+         foreignField: '_id',
+         as: 'lot_info'
+       }
+    },
+    { $unwind: { path: '$lot_info', preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: { location_id: '$location_id', item_id: '$item_id' },
+        qty_on_hand: { $sum: '$qty_on_hand' },
+        qty_reserved: { $sum: '$qty_reserved' },
+        lots: {
+          $push: {
+            lot_id: '$lot_info',
+            qty_on_hand: '$qty_on_hand',
+            qty_reserved: '$qty_reserved'
+          }
+        }
+      }
+    },
+    { $sort: { '_id.location_id': 1, '_id.item_id': 1 } },
+    { $skip: skip },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'location',
+        localField: '_id.location_id',
+        foreignField: '_id',
+        as: 'location'
+      }
+    },
+    { $unwind: { path: '$location', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'item',
+        localField: '_id.item_id',
+        foreignField: '_id',
+        as: 'item'
+      }
+    },
+    { $unwind: { path: '$item', preserveNullAndEmptyArrays: true } }
+  ];
+
+  const results = await InventoryBalance.aggregate(pipeline);
+
+  // Count total groups
+  const countPipeline = [
+    { $match: match },
+    { $group: { _id: { location_id: '$location_id', item_id: '$item_id' } } },
+    { $count: 'total' }
+  ];
+  const countResult = await InventoryBalance.aggregate(countPipeline);
+  const total = countResult.length > 0 ? countResult[0].total : 0;
+
+  // Format response to match FE 
+  const formattedResults = results.map(r => ({
+    key: `${r._id.location_id}_${r._id.item_id}`,
+    location_id: r.location,
+    item_id: r.item,
+    qty_on_hand: r.qty_on_hand,
+    qty_reserved: r.qty_reserved,
+    lots: r.lots.filter(l => l.qty_on_hand !== 0 || l.qty_reserved !== 0 || l.lot_id)
+  }));
+
+  return res.status(200).json(
+    ApiResponse.paginate(formattedResults, page, limit, total)
   );
 });

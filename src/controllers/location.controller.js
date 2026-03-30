@@ -4,6 +4,66 @@ const Location = require('../models/Location');
 const UserLocation = require('../models/UserLocation');
 const ApiResponse = require('../utils/ApiResponse');
 
+// @desc    Create new organization unit
+// @route   POST /api/locations/org-unit
+// @access  Private (Admin, Manager, Store Staff)
+exports.createOrgUnit = asyncHandler(async (req, res) => {
+  const { type, code, name, address, district, city, coordinates } = req.body;
+
+  // Validate required fields
+  if (!type || !code || !name || !address) {
+    return res.status(400).json(
+      ApiResponse.error('Type, code, name, and address are required', 400)
+    );
+  }
+
+  // Validate coordinates if provided
+  if (coordinates) {
+    const { latitude, longitude } = coordinates;
+    if (!latitude || !longitude) {
+      return res.status(400).json(
+        ApiResponse.error('Both latitude and longitude are required in coordinates', 400)
+      );
+    }
+
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      return res.status(400).json(
+        ApiResponse.error('Invalid coordinates', 400)
+      );
+    }
+  }
+
+  // Check if code already exists
+  const existingOrgUnit = await OrgUnit.findOne({ code });
+  if (existingOrgUnit) {
+    return res.status(400).json(
+      ApiResponse.error('Organization unit code already exists', 400)
+    );
+  }
+
+  // Create organization unit
+  const orgUnitData = {
+    _id: `org_${Date.now()}`,
+    type,
+    code,
+    name,
+    address,
+    district: district || '',
+    city: city || '',
+    status: 'ACTIVE'
+  };
+
+  if (coordinates) {
+    orgUnitData.coordinates = coordinates;
+  }
+
+  const orgUnit = await OrgUnit.create(orgUnitData);
+
+  return res.status(201).json(
+    ApiResponse.success(orgUnit, 'Organization unit created successfully', 201)
+  );
+});
+
 // @desc    Update organization unit coordinates (Store/Kitchen location)
 // @route   PUT /api/locations/org-unit/:id/coordinates
 // @access  Private (Store Staff for own store, Admin/Manager for all)

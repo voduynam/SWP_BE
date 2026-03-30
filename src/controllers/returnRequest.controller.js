@@ -236,67 +236,52 @@ exports.reviewReturnRequest = asyncHandler(async (req, res) => {
     console.log('Return request approved - creating replacement order');
     
     try {
-      // Create a simple replacement order for testing
-      const orderCount = await InternalOrder.countDocuments();
-      const orderNo = `REP-${String(orderCount + 1).padStart(4, '0')}`;
-      const orderId = `rep_${Date.now()}`;
+      // Create replacement order with proper lines using helper function
+      const replacementOrder = await createReplacementOrder(returnRequest, req.user.id);
+      
+      if (replacementOrder) {
+        // Update return request with replacement order info
+        returnRequest.replacement_order_id = replacementOrder._id;
+        await returnRequest.save();
 
-      const replacementOrder = await InternalOrder.create({
-        _id: orderId,
-        order_no: orderNo,
-        store_org_unit_id: returnRequest.store_org_unit_id,
-        order_date: new Date(),
-        status: 'APPROVED',
-        created_by: req.user.id,
-        total_amount: 0, // Free for customer
-        currency: 'VND',
-        is_urgent: true,
-        payment_status: 'PAID',
-        payment_method: 'ONLINE'
-      });
+        console.log('Replacement order created:', replacementOrder.order_no);
 
-      // Update return request with replacement order info
-      returnRequest.replacement_order_id = replacementOrder._id;
-      await returnRequest.save();
-
-      console.log('Replacement order created:', replacementOrder.order_no);
-
-      // Notify kitchen staff
-      await createNotificationInternal({
-        recipient_role: 'CHEF',
-        title: 'Replacement Order Created',
-        message: `Replacement order ${replacementOrder.order_no} created for return ${returnRequest.return_no}. Please prepare replacement items.`,
-        type: 'URGENT',
-        ref_type: 'ORDER',
-        ref_id: replacementOrder._id
-      });
-
-      // Create waste transaction for replacement materials
-      const returnLines = await ReturnRequestLine.find({ 
-        return_request_id: returnRequest._id 
-      }).populate('item_id').populate('uom_id');
-
-      for (const line of returnLines) {
-        const wasteValue = (line.item_id.cost_price || 0) * line.qty_return;
-        
-        await WasteTransaction.create({
-          _id: `waste_replacement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          waste_type: 'RETURN_REPLACEMENT',
-          reference_type: 'RETURN_REQUEST',
-          reference_id: returnRequest._id,
-          item_id: line.item_id._id,
-          lot_id: line.lot_id || null,
-          quantity_wasted: line.qty_return,
-          uom_id: line.uom_id,
-          unit_cost: line.item_id.cost_price || 0,
-          total_waste_value: wasteValue,
-          location_id: returnRequest.store_org_unit_id,
-          reason: `Replacement materials for return: ${line.reason}`,
-          notes: `Original return request: ${returnRequest.return_no}`,
-          created_by: req.user.id
+        // Notify kitchen staff
+        await createNotificationInternal({
+          recipient_role: 'CHEF',
+          title: 'Đơn Hàng Bù Lại',
+          message: `Đơn hàng ${replacementOrder.order_no} được tạo để bù cho phiếu trả hàng ${returnRequest.return_no}. Vui lòng chuẩn bị hàng hóa.`,
+          type: 'URGENT',
+          ref_type: 'ORDER',
+          ref_id: replacementOrder._id
         });
-      }
 
+        // Create waste transaction for replacement materials
+        const returnLines = await ReturnRequestLine.find({ 
+          return_request_id: returnRequest._id 
+        }).populate('item_id').populate('uom_id');
+
+        for (const line of returnLines) {
+          const wasteValue = (line.item_id.cost_price || 0) * line.qty_return;
+          
+          await WasteTransaction.create({
+            _id: `waste_replacement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            waste_type: 'RETURN_REPLACEMENT',
+            reference_type: 'RETURN_REQUEST',
+            reference_id: returnRequest._id,
+            item_id: line.item_id._id,
+            lot_id: line.lot_id || null,
+            quantity_wasted: line.qty_return,
+            uom_id: line.uom_id,
+            unit_cost: line.item_id.cost_price || 0,
+            total_waste_value: wasteValue,
+            location_id: returnRequest.store_org_unit_id,
+            reason: `Đền bù cho hàng trả: ${line.reason}`,
+            notes: `Phiếu trả hàng gốc: ${returnRequest.return_no}`,
+            created_by: req.user.id
+          });
+        }
+      }
     } catch (error) {
       console.error('Error creating replacement order:', error);
       // Don't fail the approval if replacement order creation fails

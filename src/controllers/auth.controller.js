@@ -88,13 +88,17 @@ exports.login = asyncHandler(async (req, res) => {
   // Find user and include password
   const user = await AppUser.findOne({ username }).select('+password');
   if (!user) {
+    console.log(`[LOGIN] User not found: ${username}`);
     return res.status(401).json(
       ApiResponse.error('Invalid credentials', 401)
     );
   }
 
+  console.log(`[LOGIN] User found: ${username}, Status: ${user.status}`);
+
   // Check if user is active
   if (user.status !== 'ACTIVE') {
+    console.log(`[LOGIN] User inactive: ${username}`);
     return res.status(401).json(
       ApiResponse.error('User account is inactive', 401)
     );
@@ -102,6 +106,8 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Verify password
   const isMatch = await user.comparePassword(password);
+  console.log(`[LOGIN] Password match for ${username}: ${isMatch}`);
+  
   if (!isMatch) {
     return res.status(401).json(
       ApiResponse.error('Invalid credentials', 401)
@@ -110,8 +116,12 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Get user roles
   const userRoles = await UserRole.find({ user_id: user._id });
+  console.log(`[LOGIN] User roles found: ${userRoles.length}`);
+  
   const roleIds = userRoles.map(ur => ur.role_id);
   const roles = await Role.find({ _id: { $in: roleIds } });
+
+  console.log(`[LOGIN] Roles: ${roles.map(r => r.code).join(', ')}`);
 
   // Generate token
   const token = generateToken({
@@ -418,5 +428,20 @@ exports.setPassword = asyncHandler(async (req, res) => {
       },
       'Password set successfully'
     )
+  );
+});
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh-token
+// @access  Public (requires valid refresh token in cookie)
+exports.refreshToken = asyncHandler(async (req, res) => {
+  // For now, just return 401 to force re-login
+  // In a full implementation, you would:
+  // 1. Check for refresh token in httpOnly cookie
+  // 2. Verify refresh token
+  // 3. Generate new access token
+  // 4. Return new access token
+  
+  return res.status(401).json(
+    ApiResponse.error('Refresh token expired or invalid. Please login again.', 401, 'REFRESH_TOKEN_EXPIRED')
   );
 });

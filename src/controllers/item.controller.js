@@ -193,6 +193,28 @@ exports.updateMaterialCostPrice = asyncHandler(async (req, res) => {
   item.updated_at = new Date();
   await item.save();
 
+  // Cascade: recalculate cost_price for all finished products using this material
+  try {
+    const RecipeLine = require('../models/RecipeLine');
+    const Recipe = require('../models/Recipe');
+    const { recalcFinishedItemCost } = require('./recipe.controller');
+
+    // Find all recipe lines that use this material
+    const affectedRecipeLines = await RecipeLine.find({ material_item_id: item._id });
+    const affectedRecipeIds = [...new Set(affectedRecipeLines.map(rl => rl.recipe_id))];
+
+    // Recalculate cost for each affected recipe's finished item
+    for (const recipeId of affectedRecipeIds) {
+      await recalcFinishedItemCost(recipeId);
+    }
+
+    if (affectedRecipeIds.length > 0) {
+      console.log(`[Cost Cascade] Updated ${affectedRecipeIds.length} finished product(s) after material cost change for ${item.name}`);
+    }
+  } catch (error) {
+    console.error('Error cascading cost price update to finished products:', error);
+  }
+
   // Create audit log for cost price changes
   try {
     const { createNotificationInternal } = require('./notification.controller');
@@ -301,6 +323,26 @@ exports.batchUpdateMaterialCostPrices = asyncHandler(async (req, res) => {
     }
   }
 
+  // Cascade: recalculate cost_price for all finished products using any updated materials
+  try {
+    const RecipeLine = require('../models/RecipeLine');
+    const { recalcFinishedItemCost } = require('./recipe.controller');
+
+    const updatedItemIds = results.map(r => r.item_id);
+    const affectedRecipeLines = await RecipeLine.find({ material_item_id: { $in: updatedItemIds } });
+    const affectedRecipeIds = [...new Set(affectedRecipeLines.map(rl => rl.recipe_id))];
+
+    for (const recipeId of affectedRecipeIds) {
+      await recalcFinishedItemCost(recipeId);
+    }
+
+    if (affectedRecipeIds.length > 0) {
+      console.log(`[Cost Cascade] Batch update: recalculated ${affectedRecipeIds.length} finished product(s)`);
+    }
+  } catch (error) {
+    console.error('Error cascading batch cost price update:', error);
+  }
+
   // Create summary notification
   try {
     const { createNotificationInternal } = require('./notification.controller');
@@ -394,3 +436,56 @@ const getSuggestedCostPrice = (materialName) => {
   }
   return 25000; // Default suggestion
 };
+
+// @desc    Recalculate cost_price for all finished products from their active recipes
+// @route   POST /api/items/recalc-finished-costs
+// @access  Private (Manager, Admin)
+exports.recalcAllFinishedProductCosts = asyncHandler(async (req, res) => {
+  const Recipe = require('../models/Recipe');
+  const RecipeLine = require('../models/RecipeLine');
+
+  // Find all active recipes
+  const activeRecipes = await Recipe.find({ status: 'ACTIVE' });
+
+  const results = [];
+
+  for (const recipe of activeRecipes) {
+    const recipeLines = await RecipeLine.find({ recipe_id: recipe._id })
+      .populate('material_item_id', 'cost_price name');
+
+    const totalCost = recipeLines.reduce((sum, line) => {
+      const materialCost = line.material_item_id?.cost_price || 0;
+      const qty = line.qty_per_batch || 0;
+      return sum + (materialCost * qty);
+    }, 0);
+
+    const item = await Item.findById(recipe.item_id);
+    if (item) {
+      const oldCostPrice = item.cost_price || 0;
+      item.cost_price = totalCost;
+      item.updated_at = new Date();
+      await item.save();
+
+      results.push({
+        item_id: item._id,
+        item_name: item.name,
+        recipe_id: recipe._id,
+        old_cost_price: oldCostPrice,
+        new_cost_price: totalCost,
+        materials: recipeLines.map(rl => ({
+          name: rl.material_item_id?.name,
+          cost_price: rl.material_item_id?.cost_price || 0,
+          qty_per_batch: rl.qty_per_batch,
+          line_cost: (rl.material_item_id?.cost_price || 0) * (rl.qty_per_batch || 0)
+        }))
+      });
+    }
+  }
+
+  return res.status(200).json(
+    ApiResponse.success({
+      recalculated_count: results.length,
+      results
+    }, `Recalculated cost_price for ${results.length} finished products`)
+  );
+});

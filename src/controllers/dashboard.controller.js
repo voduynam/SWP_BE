@@ -61,7 +61,7 @@ exports.getDashboardOverview = asyncHandler(async (req, res) => {
     .populate('item_id', 'cost_price');
 
   const totalInventoryValue = inventoryBalances.reduce((sum, balance) => {
-    return sum + (balance.qty_on_hand * (balance.item_id.cost_price || 0));
+    return sum + (balance.qty_on_hand * (balance.item_id?.cost_price || 0));
   }, 0);
 
   const totalInventoryItems = inventoryBalances.length;

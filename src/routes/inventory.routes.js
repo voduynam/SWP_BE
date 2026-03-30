@@ -71,6 +71,29 @@ router.get('/balances', inventoryController.getInventoryBalances);
 
 /**
  * @swagger
+ * /api/inventory/balances/grouped:
+ *   get:
+ *     summary: Get inventory balances grouped by item and location
+ *     tags: [Inventory]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: location_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of grouped inventory balances
+ */
+router.get('/balances/grouped', inventoryController.getInventoryBalancesGrouped);
+
+/**
+ * @swagger
  * /api/inventory/transactions:
  *   get:
  *     summary: Get inventory transactions

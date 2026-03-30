@@ -343,4 +343,18 @@ router.put('/batch-update-cost-prices', authorize('MANAGER', 'ADMIN'), itemContr
  */
 router.get('/materials-without-cost', authorize('MANAGER', 'ADMIN'), itemController.getMaterialsWithoutCost);
 
+/**
+ * @swagger
+ * /api/items/recalc-finished-costs:
+ *   post:
+ *     summary: Recalculate cost_price for all finished products from their active recipes
+ *     tags: [Items]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All finished product cost prices recalculated
+ */
+router.post('/recalc-finished-costs', authorize('MANAGER', 'ADMIN'), itemController.recalcAllFinishedProductCosts);
+
 module.exports = router;

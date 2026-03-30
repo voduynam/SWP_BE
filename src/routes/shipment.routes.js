@@ -3,7 +3,7 @@ const router = express.Router();
 const shipmentController = require('../controllers/shipment.controller');
 const { protect, authorize } = require('../middlewares/auth');
 const upload = require('../middlewares/uploadDeliveryImage');
-const uploadReceiptEvidence = require('../middlewares/uploadReceiptEvidence');
+const optionalUpload = require('../middlewares/optionalUpload');
 
 /**
  * @swagger
@@ -285,7 +285,10 @@ router.post('/', authorize('CHEF', 'MANAGER', 'ADMIN', 'SUPPLY_COORDINATOR'), sh
  *       413:
  *         description: Payload too large - File quá lớn (max 5MB)
  */
-router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER', 'SUPPLY_COORDINATOR'), upload.single('delivery_photo'), shipmentController.updateShipmentStatus);
+router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER', 'SUPPLY_COORDINATOR'), upload.fields([
+  { name: 'delivery_photo', maxCount: 1 },
+  { name: 'cod_evidence_photos', maxCount: 3 }
+]), shipmentController.updateShipmentStatus);
 
 /**
  * @swagger
@@ -306,6 +309,11 @@ router.put('/:id/status', authorize('CHEF', 'MANAGER', 'ADMIN', 'DRIVER', 'SUPPL
  *         description: Shipment dispatched and stock deducted
  */
 router.put('/:id/dispatch', authorize('CHEF', 'MANAGER', 'ADMIN', 'SUPPLY_COORDINATOR'), shipmentController.confirmDispatch);
+
+// @desc    Update COD status (Manager confirmation)
+// @route   PUT /api/shipments/:id/cod-status
+// @access  Private (Manager, Admin)
+router.put('/:id/cod-status', authorize('MANAGER', 'ADMIN'), shipmentController.updateCODStatus);
 
 /**
  * @swagger
@@ -397,6 +405,6 @@ router.put('/:id/collect-cod', protect, shipmentController.collectCOD);
  *       400:
  *         description: Bad request - Evidence photos/videos required for issues
  */
-router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), uploadReceiptEvidence.array('evidence_photos', 5), shipmentController.confirmReceipt);
+router.put('/:id/confirm-receipt', protect, authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), optionalUpload('evidence_photos', 5), shipmentController.confirmReceipt);
 
 module.exports = router;

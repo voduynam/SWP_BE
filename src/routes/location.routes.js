@@ -91,6 +91,15 @@ router.put('/org-unit/:id/coordinates',
   locationController.updateOrgUnitCoordinates
 );
 
+// @desc    Create new organization unit
+// @route   POST /api/locations/org-unit
+// @access  Private (Admin, Manager, Store Staff)
+router.post('/org-unit', 
+  protect, 
+  authorize('ADMIN', 'MANAGER', 'STORE_STAFF'),
+  locationController.createOrgUnit
+);
+
 /**
  * @swagger
  * /api/locations/org-units:

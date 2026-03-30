@@ -5,6 +5,40 @@ const Item = require('../models/Item');
 const UOM = require('../models/UOM');
 const ApiResponse = require('../utils/ApiResponse');
 
+/**
+ * Helper: Recalculate cost_price for a finished item based on its active recipe.
+ * cost_price = SUM(material.cost_price * qty_per_batch) for all recipe lines.
+ * @param {string} recipeId - The recipe ID to calculate from
+ */
+async function recalcFinishedItemCost(recipeId) {
+  try {
+    const recipe = await Recipe.findById(recipeId);
+    if (!recipe) return;
+
+    // Only recalculate if this recipe is ACTIVE
+    if (recipe.status !== 'ACTIVE') return;
+
+    const recipeLines = await RecipeLine.find({ recipe_id: recipeId })
+      .populate('material_item_id', 'cost_price');
+
+    const totalCost = recipeLines.reduce((sum, line) => {
+      const materialCost = line.material_item_id?.cost_price || 0;
+      const qty = line.qty_per_batch || 0;
+      return sum + (materialCost * qty);
+    }, 0);
+
+    // Update the finished item's cost_price
+    await Item.findByIdAndUpdate(recipe.item_id, {
+      cost_price: totalCost,
+      updated_at: new Date()
+    });
+
+    console.log(`[Recipe Cost] Updated item ${recipe.item_id} cost_price to ${totalCost}`);
+  } catch (error) {
+    console.error('[Recipe Cost] Error recalculating finished item cost:', error);
+  }
+}
+
 // @desc    Get all recipes
 // @route   GET /api/recipes
 // @access  Private
@@ -166,6 +200,9 @@ exports.createRecipe = asyncHandler(async (req, res) => {
     })
   );
 
+  // Auto-calculate finished item cost_price from material costs
+  await recalcFinishedItemCost(recipe._id);
+
   const populatedRecipe = await Recipe.findById(recipe._id)
     .populate('item_id', 'sku name item_type');
 
@@ -259,6 +296,9 @@ exports.addRecipeLine = asyncHandler(async (req, res) => {
     scrap_rate: scrap_rate || 0
   });
 
+  // Recalculate finished item cost_price after adding a line
+  await recalcFinishedItemCost(recipe._id);
+
   const populatedLine = await RecipeLine.findById(recipeLine._id)
     .populate('material_item_id', 'sku name item_type cost_price')
     .populate('uom_id', 'code name');
@@ -285,7 +325,13 @@ exports.deleteRecipeLine = asyncHandler(async (req, res) => {
 
   await RecipeLine.findByIdAndDelete(req.params.lineId);
 
+  // Recalculate finished item cost_price after deleting a line
+  await recalcFinishedItemCost(req.params.id);
+
   return res.status(200).json(
     ApiResponse.success(null, 'Recipe line deleted successfully')
   );
 });
+
+// Export helper for use in item.controller.js
+exports.recalcFinishedItemCost = recalcFinishedItemCost;

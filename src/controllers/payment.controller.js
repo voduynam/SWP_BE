@@ -35,9 +35,9 @@ exports.createPayment = asyncHandler(async (req, res) => {
     );
   }
 
-  if (!['CASH', 'BANK_TRANSFER'].includes(payment_type)) {
+  if (!['BANK_TRANSFER'].includes(payment_type)) {
     return res.status(400).json(
-      ApiResponse.error('payment_type phải là CASH hoặc BANK_TRANSFER', 400)
+      ApiResponse.error('payment_type phải là BANK_TRANSFER', 400)
     );
   }
 
@@ -48,7 +48,7 @@ exports.createPayment = asyncHandler(async (req, res) => {
   }
 
   // Kiểm tra nếu đã thanh toán
-  if (order.payment_status === 'PAID') {
+  if (order.payment_status === 'PAID' || order.payment_status === 'COD_CONFIRMED') {
     return res.status(400).json(
       ApiResponse.error('Đơn hàng này đã được thanh toán', 400)
     );
@@ -58,41 +58,7 @@ exports.createPayment = asyncHandler(async (req, res) => {
     const paymentId = uuidv4();
     const paymentNo = `PAY-${Date.now()}`;
 
-    // TH1: Thanh toán tiền mặt
-    if (payment_type === 'CASH') {
-      const payment = await Payment.create({
-        _id: paymentId,
-        payment_no: paymentNo,
-        order_id: order_id,
-        amount: order.total_amount,
-        currency: order.currency,
-        payment_method: 'CASH',
-        payment_type: 'CASH',
-        payment_status: 'COMPLETED',
-        description: `Thanh toán tiền mặt cho đơn hàng ${order.order_no}`,
-        created_by: user_id,
-        paid_at: new Date()
-      });
-
-      // Cập nhật status đơn hàng
-      order.payment_id = paymentId;
-      order.payment_status = 'PAID';
-      await order.save();
-
-      return res.status(201).json(
-        ApiResponse.success(
-          {
-            payment: payment,
-            order: order,
-            message: 'Thanh toán tiền mặt thành công'
-          },
-          'Tạo thanh toán tiền mặt thành công',
-          201
-        )
-      );
-    }
-
-    // TH2: Thanh toán chuyển khoản (PayOS)
+    // Thanh toán chuyển khoản (PayOS)
     if (payment_type === 'BANK_TRANSFER') {
       // Tạo order code cho PayOS
       const orderCode = `${Date.now()}`;

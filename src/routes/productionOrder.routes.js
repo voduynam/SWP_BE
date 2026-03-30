@@ -326,4 +326,24 @@ router.post('/:id/execute-compensation', authorize('CHEF', 'MANAGER', 'ADMIN'), 
  */
 router.post('/:id/waste', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.recordProductionWaste);
 
+/**
+ * @swagger
+ * /api/production-orders/{id}/sync-inventory:
+ *   post:
+ *     summary: Sync production outputs to inventory
+ *     tags: [Production Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Production outputs synced to inventory successfully
+ */
+router.post('/:id/sync-inventory', authorize('CHEF', 'MANAGER', 'ADMIN'), productionOrderController.syncProductionToInventory);
+
 module.exports = router;
