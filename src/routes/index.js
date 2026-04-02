@@ -23,6 +23,10 @@ const performanceMetricsRoutes = require('./performanceMetrics.routes');
 const notificationRoutes = require('./notification.routes');
 const paymentRoutes = require('./payment.routes');
 const locationRoutes = require('./location.routes');
+const materialRequestRoutes = require('./materialRequest.routes');
+const wasteReportRoutes = require('./wasteReport.routes');
+const productionVarianceCostRoutes = require('./productionVarianceCost.routes');
+const performanceRoutes = require('./performance.routes');
 
 // Define routes
 router.use('/auth', authRoutes);
@@ -46,6 +50,10 @@ router.use('/performance-metrics', performanceMetricsRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/locations', locationRoutes);
+router.use('/material-requests', materialRequestRoutes);
+router.use('/waste-reports', wasteReportRoutes);
+router.use('/production-variance-costs', productionVarianceCostRoutes);
+router.use('/performance', performanceRoutes);
 
 // Default route
 router.get('/', (req, res) => {
@@ -73,7 +81,11 @@ router.get('/', (req, res) => {
       'performance-metrics': '/api/performance-metrics',
       notifications: '/api/notifications',
       payments: '/api/payments',
-      locations: '/api/locations'
+      locations: '/api/locations',
+      'material-requests': '/api/material-requests',
+      'waste-reports': '/api/waste-reports',
+      'production-variance-costs': '/api/production-variance-costs',
+      performance: '/api/performance'
     }
   });
 });

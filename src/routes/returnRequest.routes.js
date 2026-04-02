@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const returnRequestController = require('../controllers/returnRequest.controller');
 const { protect, authorize } = require('../middlewares/auth');
+const uploadReturnEvidence = require('../middlewares/uploadReturnEvidence');
 
 /**
  * @swagger
@@ -81,7 +82,12 @@ router.get('/:id', returnRequestController.getReturnRequest);
  *       201:
  *         description: Return request created with evidence photos
  */
-router.post('/', authorize('STORE_STAFF', 'MANAGER', 'ADMIN'), returnRequestController.createReturnRequest);
+router.post(
+  '/',
+  authorize('STORE_STAFF', 'MANAGER', 'ADMIN'),
+  uploadReturnEvidence,
+  returnRequestController.createReturnRequest
+);
 
 /**
  * @swagger

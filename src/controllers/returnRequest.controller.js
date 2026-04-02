@@ -92,9 +92,21 @@ exports.getReturnRequest = asyncHandler(async (req, res) => {
 // @route   POST /api/return-requests
 // @access  Private (Store Staff, Manager, Admin)
 exports.createReturnRequest = asyncHandler(async (req, res) => {
-  const { store_org_unit_id, goods_receipt_id, return_date, reason, lines } = req.body;
+  const { store_org_unit_id, goods_receipt_id, return_date, reason } = req.body;
+  let { lines } = req.body;
 
-  if (!lines || lines.length === 0) {
+  // multipart/form-data sends nested values as strings
+  if (typeof lines === 'string') {
+    try {
+      lines = JSON.parse(lines);
+    } catch (e) {
+      return res.status(400).json(
+        ApiResponse.error('Invalid lines JSON', 400)
+      );
+    }
+  }
+
+  if (!Array.isArray(lines) || lines.length === 0) {
     return res.status(400).json(
       ApiResponse.error('Return request must have at least one line', 400)
     );
@@ -123,12 +135,9 @@ exports.createReturnRequest = asyncHandler(async (req, res) => {
       description: `Evidence photo for return ${returnNo}`
     }));
   } else {
-    // For testing without actual file upload
-    evidencePhotos = [{
-      photo_url: '/uploads/return-evidence/test_evidence.jpg',
-      uploaded_at: new Date(),
-      description: `Test evidence photo for return ${returnNo}`
-    }];
+    return res.status(400).json(
+      ApiResponse.error('Evidence photos are required', 400)
+    );
   }
 
   // Create return request

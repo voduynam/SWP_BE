@@ -612,6 +612,12 @@ exports.confirmDispatch = asyncHandler(async (req, res) => {
     ref_id: shipment._id
   });
 
+  const populatedShipment = await Shipment.findById(shipment._id)
+    .populate('order_id', 'order_no order_date status')
+    .populate('from_location_id', 'name code coordinates')
+    .populate('to_location_id', 'name code coordinates')
+    .populate('created_by', 'username full_name');
+
   return res.status(200).json(
     ApiResponse.success(populatedShipment, 'Shipment dispatched and CK stock deducted')
   );
@@ -758,7 +764,11 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
   console.log('Request files:', req.files);
   console.log('User:', req.user);
   
-  const { receipt_status, receipt_notes, delivery_discrepancy } = req.body;
+  const { receipt_notes, delivery_discrepancy } = req.body;
+  const receipt_status =
+    typeof req.body.receipt_status === 'string'
+      ? req.body.receipt_status.trim()
+      : req.body.receipt_status;
   
   const shipment = await Shipment.findById(req.params.id)
     .populate('order_id', 'order_no status')
@@ -784,25 +794,56 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
     );
   }
 
-  // Validate receipt status
+  // Validate receipt status (multipart đã được multer parse nhờ optionalUpload trên route)
   const validReceiptStatuses = ['RECEIVED_OK', 'RECEIVED_WITH_ISSUES', 'NOT_RECEIVED'];
-  if (!validReceiptStatuses.includes(receipt_status)) {
+  if (!receipt_status || !validReceiptStatuses.includes(receipt_status)) {
     return res.status(400).json(
-      ApiResponse.error('Invalid receipt status', 400)
+      ApiResponse.error(
+        `Invalid receipt status. Gửi receipt_status là một trong: ${validReceiptStatuses.join(', ')}.`,
+        400
+      )
     );
   }
 
-  // Handle evidence photos/videos for issues
+  // Handle evidence photos/videos (Cloudinary qua uploadReceiptEvidence hoặc path tương đối nếu disk)
   let evidenceFiles = [];
-  if (req.files && req.files.length > 0) {
-    evidenceFiles = req.files.map(file => ({
-      url: `/uploads/receipt-evidence/${file.filename}`,
-      type: file.mimetype.startsWith('video/') ? 'video' : 'image',
-      filename: file.filename,
-      originalname: file.originalname,
-      uploaded_at: new Date()
-    }));
+  const uploaded = Array.isArray(req.files) ? req.files : [];
+  if (uploaded.length > 0) {
+    evidenceFiles = uploaded
+      .map(file => ({
+        url:
+          file.secure_url ||
+          file.path ||
+          file.url ||
+          (file.filename ? `/uploads/receipt-evidence/${file.filename}` : ''),
+        type: file.mimetype && file.mimetype.startsWith('video/') ? 'video' : 'image',
+        filename: file.filename || file.originalname,
+        originalname: file.originalname,
+        uploaded_at: new Date()
+      }))
+      .filter(e => e.url);
   }
+
+  /** Map shipment_line_id -> qty_received từ FE (JSON string trong multipart) */
+  const parseReceiptLineQtyMap = (body) => {
+    const raw = body?.receipt_lines;
+    if (raw == null || raw === '') return null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!Array.isArray(parsed)) return null;
+      const map = {};
+      parsed.forEach((row) => {
+        const sid = row?.shipment_line_id != null ? String(row.shipment_line_id) : '';
+        if (!sid) return;
+        const q = Number(row?.qty_received);
+        if (Number.isFinite(q) && q >= 0) map[sid] = q;
+      });
+      return map;
+    } catch {
+      return null;
+    }
+  };
+  const qtyByShipmentLineId = parseReceiptLineQtyMap(req.body);
 
   console.log('Evidence files count:', evidenceFiles.length);
   console.log('Receipt status:', receipt_status);
@@ -838,17 +879,18 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
     const GoodsReceipt = require('../models/GoodsReceipt');
     const GoodsReceiptLine = require('../models/GoodsReceiptLine');
     const ShipmentLine = require('../models/ShipmentLine');
-    
+    const OrderFulfillment = require('../models/OrderFulfillment');
+
     // Check if goods receipt already exists for this shipment
     const existingReceipt = await GoodsReceipt.findOne({ shipment_id: shipment._id });
     if (!existingReceipt) {
       // Get shipment lines
       const shipmentLines = await ShipmentLine.find({ shipment_id: shipment._id });
-      
+
       // Generate receipt number
       const receiptCount = await GoodsReceipt.countDocuments();
       const receiptNo = `GR-${String(receiptCount + 1).padStart(4, '0')}`;
-      
+
       // Create goods receipt
       const goodsReceipt = await GoodsReceipt.create({
         _id: `gr_${Date.now()}`,
@@ -861,21 +903,42 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
         discrepancy_info: receipt_status === 'RECEIVED_WITH_ISSUES' ? delivery_discrepancy : '',
         evidence_photos: evidenceFiles
       });
-      
-      // Create goods receipt lines
+
+      // Create goods receipt lines + cập nhật OrderFulfillment.qty_received_total (hiển thị "Đã nhận" trên đơn)
       for (const shipmentLine of shipmentLines) {
+        const maxQty = Number(shipmentLine.qty) || 0;
+        const sid = String(shipmentLine._id);
+        let qtyRec =
+          qtyByShipmentLineId && Object.prototype.hasOwnProperty.call(qtyByShipmentLineId, sid)
+            ? qtyByShipmentLineId[sid]
+            : maxQty;
+        if (!Number.isFinite(qtyRec) || qtyRec < 0) qtyRec = 0;
+        if (qtyRec > maxQty) qtyRec = maxQty;
+
         await GoodsReceiptLine.create({
           _id: `grl_${goodsReceipt._id}_${shipmentLine._id}`,
           receipt_id: goodsReceipt._id,
           shipment_line_id: shipmentLine._id,
           item_id: shipmentLine.item_id,
           uom_id: shipmentLine.uom_id,
-          qty_received: shipmentLine.qty,
+          qty_received: qtyRec,
           qty_reserved: 0,
           notes: receipt_status === 'RECEIVED_WITH_ISSUES' ? 'Có vấn đề - cần xử lý trả hàng' : ''
         });
+
+        if (qtyRec > 0 && shipmentLine.order_line_id) {
+          const fulfillment = await OrderFulfillment.findOne({
+            order_line_id: shipmentLine.order_line_id
+          });
+          if (fulfillment) {
+            fulfillment.qty_received_total =
+              (Number(fulfillment.qty_received_total) || 0) + qtyRec;
+            fulfillment.updated_at = new Date();
+            await fulfillment.save();
+          }
+        }
       }
-      
+
       console.log('Created goods receipt:', receiptNo, 'for shipment:', shipment.shipment_no);
     }
   }
