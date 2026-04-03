@@ -3,9 +3,8 @@ const GoodsReceipt = require('../models/GoodsReceipt');
 const GoodsReceiptLine = require('../models/GoodsReceiptLine');
 const Shipment = require('../models/Shipment');
 const OrderFulfillment = require('../models/OrderFulfillment');
-const InventoryBalance = require('../models/InventoryBalance');
-const InventoryTransaction = require('../models/InventoryTransaction');
 const ApiResponse = require('../utils/ApiResponse');
+const { applyInventoryForGoodsReceipt } = require('../services/goodsReceiptInventory.service');
 
 // @desc    Get all goods receipts
 // @route   GET /api/goods-receipts
@@ -225,57 +224,10 @@ exports.confirmGoodsReceipt = asyncHandler(async (req, res) => {
     );
   }
 
-  const receiptLines = await GoodsReceiptLine.find({ receipt_id: receipt._id })
-    .populate('item_id')
-    .populate('shipment_line_id');
-
   const shipment = await Shipment.findById(receipt.shipment_id._id);
 
-  // Process each line and update inventory
-  for (const line of receiptLines) {
-    if (line.qty_received > 0) {
-      // Get lot from shipment line lot if exists
-      const shipmentLineLot = await require('../models/ShipmentLineLot').findOne({
-        shipment_line_id: line.shipment_line_id._id
-      });
-
-      // Update inventory balance
-      const balanceFilter = {
-        location_id: shipment.to_location_id,
-        item_id: line.item_id._id,
-        lot_id: shipmentLineLot ? shipmentLineLot.lot_id : null
-      };
-
-      let balance = await InventoryBalance.findOne(balanceFilter);
-      if (!balance) {
-        balance = await InventoryBalance.create({
-          location_id: shipment.to_location_id,
-          item_id: line.item_id._id,
-          lot_id: shipmentLineLot ? shipmentLineLot.lot_id : null,
-          qty_on_hand: 0,
-          qty_reserved: 0
-        });
-      }
-
-      balance.qty_on_hand += line.qty_received;
-      balance.updated_at = new Date();
-      await balance.save();
-
-      // Create inventory transaction
-      await InventoryTransaction.create({
-        txn_time: new Date(),
-        location_id: shipment.to_location_id,
-        item_id: line.item_id._id,
-        lot_id: shipmentLineLot ? shipmentLineLot.lot_id : null,
-        qty: line.qty_received,
-        uom_id: line.item_id.base_uom_id,
-        txn_type: 'TRANSFER_IN',
-        ref_type: 'GOODS_RECEIPT',
-        ref_id: receipt._id,
-        created_by: req.user.id
-      });
-    }
-  }
+  const userId = req.user.id || req.user._id;
+  await applyInventoryForGoodsReceipt(receipt._id, shipment, userId);
 
   // Update receipt status
   receipt.status = 'RECEIVED';

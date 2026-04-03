@@ -4,6 +4,7 @@ const ShipmentLine = require('../models/ShipmentLine');
 const ShipmentLineLot = require('../models/ShipmentLineLot');
 const InternalOrder = require('../models/InternalOrder');
 const ApiResponse = require('../utils/ApiResponse');
+const { applyInventoryForGoodsReceipt } = require('../services/goodsReceiptInventory.service');
 
 // @desc    Get all shipments
 // @route   GET /api/shipments
@@ -938,6 +939,9 @@ exports.confirmReceipt = asyncHandler(async (req, res) => {
           }
         }
       }
+
+      const userId = req.user.id || req.user._id;
+      await applyInventoryForGoodsReceipt(goodsReceipt._id, shipment, userId);
 
       console.log('Created goods receipt:', receiptNo, 'for shipment:', shipment.shipment_no);
     }
